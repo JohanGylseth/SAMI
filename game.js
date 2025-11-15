@@ -21,9 +21,8 @@ const config = {
 // Game State
 let gameState = {
     level: 1,
-    xp: 0,
-    xpMax: 100,
-    reindeer: 0,
+    decorations: [], // Decorative items placed in the city
+    decorationsUnlocked: [], // Available decorations to place
     buildings: [],
     tasks: [],
     completedTasks: [],
@@ -37,8 +36,11 @@ let wasd;
 let buildings = [];
 let interactables = [];
 let locations = [];
+let decorations = [];
 let currentBuildingType = null;
+let currentDecorationType = null;
 let isBuildingMode = false;
+let isDecorationMode = false;
 let activeMiniGame = null;
 let sceneRef = null;
 
@@ -63,6 +65,16 @@ const educationalContent = {
         title: "Gárdi - Storage",
         text: "Traditional Sámi storage buildings (gárdi) were used to store food, tools, and supplies. They were built to withstand the harsh Arctic climate.",
         samiWord: "Gárdi (Storage)"
+    },
+    classroom: {
+        title: "Skuvla - School",
+        text: "Education is important in Sámi culture. Schools help preserve the Sámi language and teach about traditional ways of life.",
+        samiWord: "Skuvla (School)"
+    },
+    painting: {
+        title: "Dáidda - Art",
+        text: "Sámi art includes duodji (handicrafts) and traditional patterns. Art is an important way to express Sámi culture and identity.",
+        samiWord: "Dáidda (Art)"
     },
     icefishing: {
         title: "Jiekŋaguollevuohta - Ice Fishing",
@@ -100,8 +112,28 @@ const gameLocations = [
         icon: '🍳',
         color: 0xCD853F,
         radius: 100
+    },
+    {
+        id: 'classroom',
+        name: 'Classroom',
+        x: 600,
+        y: 800,
+        icon: '🏫',
+        color: 0x9370DB,
+        radius: 110
     }
 ];
+
+// Decoration types
+const decorationTypes = {
+    'building-small': { name: 'Small Building', icon: '🏠', emoji: '🏠' },
+    'building-large': { name: 'Large Building', icon: '🏛️', emoji: '🏛️' },
+    'dog': { name: 'Dog', icon: '🐕', emoji: '🐕' },
+    'reindeer': { name: 'Reindeer', icon: '🦌', emoji: '🦌' },
+    'human': { name: 'Person', icon: '👤', emoji: '👤' },
+    'tree': { name: 'Tree', icon: '🌲', emoji: '🌲' },
+    'fire': { name: 'Campfire', icon: '🔥', emoji: '🔥' }
+};
 
 // Tasks System
 const availableTasks = [
@@ -112,7 +144,7 @@ const availableTasks = [
         samiWord: 'Lávvu',
         progress: 0,
         maxProgress: 1,
-        reward: { xp: 50, reindeer: 0 },
+        reward: { decorations: ['building-small', 'tree'] },
         type: 'build',
         target: 'tent',
         requiresLocation: null
@@ -124,7 +156,7 @@ const availableTasks = [
         samiWord: 'Jiekŋaguollevuohta',
         progress: 0,
         maxProgress: 3,
-        reward: { xp: 100, reindeer: 0 },
+        reward: { decorations: ['reindeer', 'dog'] },
         type: 'location',
         target: 'lake',
         requiresLocation: 'lake',
@@ -137,11 +169,50 @@ const availableTasks = [
         samiWord: 'Bidos',
         progress: 0,
         maxProgress: 5,
-        reward: { xp: 150, reindeer: 0 },
+        reward: { decorations: ['building-small', 'fire'] },
         type: 'location',
         target: 'kitchen',
         requiresLocation: 'kitchen',
         miniGame: 'cutting'
+    },
+    {
+        id: 'paint',
+        title: 'Paint Traditional Art',
+        description: 'Go to the classroom and create traditional Sámi art. Click on the classroom when nearby!',
+        samiWord: 'Dáidda',
+        progress: 0,
+        maxProgress: 1,
+        reward: { decorations: ['human', 'tree'] },
+        type: 'location',
+        target: 'classroom',
+        requiresLocation: 'classroom',
+        miniGame: 'painting'
+    },
+    {
+        id: 'language-quiz',
+        title: 'Learn Sámi Language',
+        description: 'Go to the classroom and take a quiz to learn Sámi words. Click on the classroom when nearby!',
+        samiWord: 'Giella',
+        progress: 0,
+        maxProgress: 5,
+        reward: { decorations: ['building-small', 'dog'] },
+        type: 'location',
+        target: 'classroom',
+        requiresLocation: 'classroom',
+        miniGame: 'language-quiz'
+    },
+    {
+        id: 'history-quiz',
+        title: 'Learn Sámi History',
+        description: 'Go to the classroom and take a quiz about Sámi history. Click on the classroom when nearby!',
+        samiWord: 'Historia',
+        progress: 0,
+        maxProgress: 5,
+        reward: { decorations: ['building-large', 'reindeer'] },
+        type: 'location',
+        target: 'classroom',
+        requiresLocation: 'classroom',
+        miniGame: 'history-quiz'
     },
     {
         id: 'build-storage',
@@ -150,7 +221,7 @@ const availableTasks = [
         samiWord: 'Gárdi',
         progress: 0,
         maxProgress: 1,
-        reward: { xp: 75, reindeer: 0 },
+        reward: { decorations: ['building-small', 'fire'] },
         type: 'build',
         target: 'storage',
         requiresLocation: null
@@ -162,21 +233,9 @@ const availableTasks = [
         samiWord: 'Boazodoallu',
         progress: 0,
         maxProgress: 1,
-        reward: { xp: 200, reindeer: 5 },
+        reward: { decorations: ['reindeer', 'reindeer', 'building-large'] },
         type: 'build',
         target: 'reindeer-farm',
-        requiresLocation: null
-    },
-    {
-        id: 'collect-reindeer',
-        title: 'Grow Your Herd',
-        description: 'Collect 10 reindeer to expand your herd.',
-        samiWord: 'Boazu',
-        progress: 0,
-        maxProgress: 10,
-        reward: { xp: 150, reindeer: 3 },
-        type: 'collect',
-        target: 'reindeer',
         requiresLocation: null
     }
 ];
@@ -258,20 +317,107 @@ function preload() {
         .fillStyle(0xCD853F, 0.6)
         .fillCircle(0, 0, 100)
         .generateTexture('kitchen-area', 200, 200);
+    
+    this.add.graphics()
+        .fillStyle(0x9370DB, 0.6)
+        .fillCircle(0, 0, 110)
+        .generateTexture('classroom-area', 220, 220);
+    
+    // Create decoration textures
+    this.add.graphics()
+        .fillStyle(0x8B4513)
+        .fillRect(0, 0, 30, 30)
+        .generateTexture('decoration-building-small', 30, 30);
+    
+    this.add.graphics()
+        .fillStyle(0x654321)
+        .fillRect(0, 0, 40, 40)
+        .generateTexture('decoration-building-large', 40, 40);
+    
+    this.add.graphics()
+        .fillStyle(0xFFD700)
+        .fillCircle(0, 0, 15)
+        .generateTexture('decoration-dog', 30, 30);
+    
+    this.add.graphics()
+        .fillStyle(0x8B7355)
+        .fillCircle(0, 0, 18)
+        .generateTexture('decoration-reindeer', 36, 36);
+    
+    this.add.graphics()
+        .fillStyle(0xFF6B6B)
+        .fillCircle(0, 0, 12)
+        .generateTexture('decoration-human', 24, 24);
+    
+    this.add.graphics()
+        .fillStyle(0x228B22)
+        .fillRect(0, 0, 20, 30)
+        .generateTexture('decoration-tree', 20, 30);
+    
+    this.add.graphics()
+        .fillStyle(0xFF4500)
+        .fillCircle(0, 0, 15)
+        .generateTexture('decoration-fire', 30, 30);
 }
 
 function create() {
-    // Create world background
+    // Create world background with terrain
     this.add.rectangle(0, 0, config.width * 2, config.height * 2, 0x87CEEB)
         .setOrigin(0, 0);
     
-    // Add some terrain features
-    for (let i = 0; i < 50; i++) {
+    // Add grass patches
+    for (let i = 0; i < 80; i++) {
         const x = Phaser.Math.Between(0, config.width * 2);
         const y = Phaser.Math.Between(0, config.height * 2);
-        const size = Phaser.Math.Between(20, 40);
-        this.add.circle(x, y, size, 0x90EE90, 0.3);
+        const size = Phaser.Math.Between(25, 50);
+        this.add.circle(x, y, size, 0x90EE90, 0.4);
     }
+    
+    // Add rocks
+    for (let i = 0; i < 30; i++) {
+        const x = Phaser.Math.Between(0, config.width * 2);
+        const y = Phaser.Math.Between(0, config.height * 2);
+        const size = Phaser.Math.Between(10, 20);
+        this.add.circle(x, y, size, 0x696969, 0.6);
+    }
+    
+    // Add trees in background
+    for (let i = 0; i < 40; i++) {
+        const x = Phaser.Math.Between(0, config.width * 2);
+        const y = Phaser.Math.Between(0, config.height * 2);
+        const trunkHeight = Phaser.Math.Between(15, 25);
+        const trunkWidth = Phaser.Math.Between(5, 8);
+        this.add.rectangle(x, y, trunkWidth, trunkHeight, 0x8B4513, 0.5);
+        this.add.circle(x, y - trunkHeight/2, Phaser.Math.Between(12, 18), 0x228B22, 0.4);
+    }
+    
+    // Add paths connecting locations
+    const pathGraphics = this.add.graphics();
+    pathGraphics.lineStyle(30, 0xD2B48C, 0.6);
+    
+    // Path from start to lake
+    pathGraphics.beginPath();
+    pathGraphics.moveTo(400, 300);
+    pathGraphics.lineTo(800, 600);
+    pathGraphics.strokePath();
+    
+    // Path from lake to kitchen
+    pathGraphics.beginPath();
+    pathGraphics.moveTo(800, 600);
+    pathGraphics.lineTo(1200, 400);
+    pathGraphics.strokePath();
+    
+    // Path from kitchen to classroom
+    pathGraphics.beginPath();
+    pathGraphics.moveTo(1200, 400);
+    pathGraphics.lineTo(600, 800);
+    pathGraphics.strokePath();
+    
+    // Path from classroom to lake
+    pathGraphics.beginPath();
+    pathGraphics.moveTo(600, 800);
+    pathGraphics.lineTo(800, 600);
+    pathGraphics.strokePath();
     
     // Create locations
     createLocations(this);
@@ -311,11 +457,14 @@ function create() {
     this.input.keyboard.on('keydown-M', () => toggleMenu());
     this.input.keyboard.on('keydown-B', () => toggleBuildingPanel());
     this.input.keyboard.on('keydown-T', () => toggleTaskPanel());
+    this.input.keyboard.on('keydown-D', () => toggleDecorationPanel());
     
     // Mouse click for building/interaction
     this.input.on('pointerdown', (pointer) => {
         if (isBuildingMode && currentBuildingType) {
             placeBuilding(this, pointer.worldX, pointer.worldY);
+        } else if (isDecorationMode && currentDecorationType) {
+            placeDecoration(this, pointer.worldX, pointer.worldY);
         } else {
             checkInteractions(this, pointer.worldX, pointer.worldY);
         }
@@ -331,6 +480,9 @@ function create() {
     
     // Load existing buildings
     loadBuildings(this);
+    
+    // Load existing decorations
+    loadDecorations(this);
     
     // Show welcome message
     setTimeout(() => {
@@ -449,18 +601,6 @@ function toggleBuildingPanel() {
 function placeBuilding(scene, x, y) {
     if (!currentBuildingType) return;
     
-    const buildingCosts = {
-        'tent': 50,
-        'reindeer-farm': 200,
-        'storage': 100
-    };
-    
-    const cost = buildingCosts[currentBuildingType];
-    if (gameState.xp < cost) {
-        alert(`Not enough XP! You need ${cost} XP to build this.`);
-        return;
-    }
-    
     // Check if too close to other buildings
     const minDistance = 100;
     for (let building of buildings) {
@@ -486,20 +626,11 @@ function placeBuilding(scene, x, y) {
         y: y
     });
     
-    // Deduct XP
-    gameState.xp -= cost;
-    
     // Show educational content
     showEducationalPopup(currentBuildingType);
     
     // Update tasks
     updateTaskProgress('build', currentBuildingType);
-    
-    // Give rewards
-    if (currentBuildingType === 'reindeer-farm') {
-        gameState.reindeer += 3;
-        showReward('You built a reindeer farm! +3 Reindeer');
-    }
     
     // Update UI
     updateUI();
@@ -509,6 +640,109 @@ function placeBuilding(scene, x, y) {
     
     // Exit building mode
     toggleBuildingPanel();
+}
+
+function toggleDecorationPanel() {
+    const panel = document.getElementById('decoration-panel');
+    panel.classList.toggle('hidden');
+    isDecorationMode = !panel.classList.contains('hidden');
+    if (!isDecorationMode) {
+        currentDecorationType = null;
+    } else {
+        updateDecorationPanel();
+    }
+}
+
+function updateDecorationPanel() {
+    const container = document.getElementById('decoration-options');
+    container.innerHTML = '';
+    
+    if (gameState.decorationsUnlocked.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999;">Complete tasks to unlock decorations!</p>';
+        return;
+    }
+    
+    gameState.decorationsUnlocked.forEach(decType => {
+        const dec = decorationTypes[decType];
+        if (!dec) return;
+        
+        const count = gameState.decorations.filter(d => d.type === decType).length;
+        const btn = document.createElement('button');
+        btn.className = 'decoration-btn';
+        btn.innerHTML = `
+            <div style="font-size: 48px;">${dec.emoji}</div>
+            <div style="font-weight: bold; margin-top: 5px;">${dec.name}</div>
+            <div style="font-size: 12px; color: #ffd700;">Placed: ${count}</div>
+        `;
+        btn.setAttribute('data-decoration', decType);
+        btn.style.cssText = `
+            background: rgba(102, 126, 234, 0.2);
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            text-align: center;
+        `;
+        
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'rgba(102, 126, 234, 0.4)';
+            btn.style.transform = 'scale(1.05)';
+        });
+        
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'rgba(102, 126, 234, 0.2)';
+            btn.style.transform = 'scale(1)';
+        });
+        
+        btn.addEventListener('click', () => {
+            currentDecorationType = decType;
+            document.querySelectorAll('.decoration-btn').forEach(b => {
+                b.style.borderColor = '#667eea';
+            });
+            btn.style.borderColor = '#ffd700';
+        });
+        
+        container.appendChild(btn);
+    });
+}
+
+function placeDecoration(scene, x, y) {
+    if (!currentDecorationType) return;
+    
+    // Create decoration sprite
+    const decoration = scene.add.sprite(x, y, 'decoration-' + currentDecorationType);
+    decoration.setScale(1.2);
+    decoration.setInteractive();
+    decoration.setData('type', currentDecorationType);
+    
+    decorations.push(decoration);
+    
+    // Add to game state
+    gameState.decorations.push({
+        type: currentDecorationType,
+        x: x,
+        y: y
+    });
+    
+    // Update UI
+    updateUI();
+    
+    // Save game
+    saveGame();
+}
+
+function loadDecorations(scene) {
+    if (!gameState.decorations) return;
+    
+    gameState.decorations.forEach(decData => {
+        const decoration = scene.add.sprite(decData.x, decData.y, 'decoration-' + decData.type);
+        decoration.setScale(1.2);
+        decoration.setInteractive();
+        decoration.setData('type', decData.type);
+        decorations.push(decoration);
+    });
 }
 
 function loadBuildings(scene) {
@@ -555,6 +789,12 @@ function checkInteractions(scene, x, y) {
 }
 
 function interactWithLocation(locationId, scene) {
+    if (locationId === 'classroom') {
+        // Show classroom activity selection
+        showClassroomMenu(scene);
+        return;
+    }
+    
     // Find active tasks that require this location
     const activeTasks = gameState.tasks.filter(task => 
         !task.completed && 
@@ -578,15 +818,91 @@ function interactWithLocation(locationId, scene) {
     }
 }
 
+function showClassroomMenu(scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'classroom-menu';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    `;
+    
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 30px; color: #ffd700; font-size: 32px;">Classroom - Skuvla</h2>
+        <div style="display: flex; gap: 30px; flex-wrap: wrap; justify-content: center;">
+            <button id="paint-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 30px 40px; border-radius: 15px; cursor: pointer; font-size: 20px; min-width: 200px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+                <div style="font-size: 48px; margin-bottom: 10px;">🎨</div>
+                <div>Paint</div>
+                <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Dáidda</div>
+            </button>
+            <button id="language-quiz-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 30px 40px; border-radius: 15px; cursor: pointer; font-size: 20px; min-width: 200px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+                <div style="font-size: 48px; margin-bottom: 10px;">📚</div>
+                <div>Language Quiz</div>
+                <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Giella</div>
+            </button>
+            <button id="history-quiz-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 30px 40px; border-radius: 15px; cursor: pointer; font-size: 20px; min-width: 200px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+                <div style="font-size: 48px; margin-bottom: 10px;">📖</div>
+                <div>History Quiz</div>
+                <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Historia</div>
+            </button>
+        </div>
+        <button id="close-classroom" style="margin-top: 30px; padding: 12px 30px; font-size: 16px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Close</button>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    document.getElementById('paint-btn').addEventListener('click', () => {
+        overlay.remove();
+        const task = gameState.tasks.find(t => t.id === 'paint' && !t.completed);
+        if (task) {
+            startMiniGame('painting', task, scene);
+        } else {
+            startMiniGame('painting', { id: 'paint', progress: 0, maxProgress: 1, reward: { decorations: ['human', 'tree'] } }, scene);
+        }
+    });
+    
+    document.getElementById('language-quiz-btn').addEventListener('click', () => {
+        overlay.remove();
+        const task = gameState.tasks.find(t => t.id === 'language-quiz' && !t.completed);
+        if (task) {
+            startMiniGame('language-quiz', task, scene);
+        } else {
+            startMiniGame('language-quiz', { id: 'language-quiz', progress: 0, maxProgress: 5, reward: { decorations: ['building-small', 'dog'] } }, scene);
+        }
+    });
+    
+    document.getElementById('history-quiz-btn').addEventListener('click', () => {
+        overlay.remove();
+        const task = gameState.tasks.find(t => t.id === 'history-quiz' && !t.completed);
+        if (task) {
+            startMiniGame('history-quiz', task, scene);
+        } else {
+            startMiniGame('history-quiz', { id: 'history-quiz', progress: 0, maxProgress: 5, reward: { decorations: ['building-large', 'reindeer'] } }, scene);
+        }
+    });
+    
+    document.getElementById('close-classroom').addEventListener('click', () => {
+        overlay.remove();
+    });
+}
+
 function interactWithBuilding(type) {
     switch(type) {
         case 'reindeer-farm':
-            // Collect reindeer
-            const collected = Math.floor(Math.random() * 2) + 1;
-            gameState.reindeer += collected;
-            gameState.xp += collected * 5;
-            showReward(`Collected ${collected} reindeer! +${collected * 5} XP`);
-            updateTaskProgress('collect', 'reindeer', collected);
+            // Give decoration reward
+            if (!gameState.decorationsUnlocked.includes('reindeer')) {
+                gameState.decorationsUnlocked.push('reindeer');
+            }
+            showReward('You can now place reindeer decorations!');
             updateUI();
             saveGame();
             break;
@@ -615,26 +931,31 @@ function updateTaskProgress(type, target, amount = 1) {
 
 function completeTask(task) {
     task.completed = true;
-    gameState.xp += task.reward.xp;
-    gameState.reindeer += task.reward.reindeer;
     gameState.completedTasks.push(task.id);
     
-    // Check for level up
-    checkLevelUp();
+    // Give decoration rewards
+    if (task.reward && task.reward.decorations) {
+        task.reward.decorations.forEach(decorationType => {
+            if (!gameState.decorationsUnlocked.includes(decorationType)) {
+                gameState.decorationsUnlocked.push(decorationType);
+            }
+        });
+        
+        const rewardText = `Task Complete! You earned: ${task.reward.decorations.map(d => decorationTypes[d].name).join(', ')}`;
+        showReward(rewardText);
+        showDecorationReward(task.reward.decorations);
+    }
     
-    showReward(`Task Complete! +${task.reward.xp} XP, +${task.reward.reindeer} Reindeer`);
     updateUI();
     updateTaskUI();
     saveGame();
 }
 
-function checkLevelUp() {
-    while (gameState.xp >= gameState.xpMax) {
-        gameState.xp -= gameState.xpMax;
-        gameState.level++;
-        gameState.xpMax = Math.floor(gameState.xpMax * 1.5);
-        showReward(`Level Up! You are now level ${gameState.level}!`);
-    }
+function showDecorationReward(decorationTypes) {
+    setTimeout(() => {
+        const message = `You can now place these decorations! Press D to open the decoration menu.`;
+        alert(message);
+    }, 2000);
 }
 
 // UI Functions
@@ -653,9 +974,10 @@ function toggleTaskPanel() {
 
 function updateUI() {
     document.getElementById('player-level').textContent = gameState.level;
-    document.getElementById('player-xp').textContent = gameState.xp;
-    document.getElementById('player-xp-max').textContent = gameState.xpMax;
-    document.getElementById('reindeer-count').textContent = gameState.reindeer;
+    const decorationCount = gameState.decorationsUnlocked.length;
+    document.getElementById('player-xp').textContent = decorationCount;
+    document.getElementById('player-xp-max').textContent = Object.keys(decorationTypes).length;
+    document.getElementById('reindeer-count').textContent = gameState.decorations.length;
 }
 
 function updateTaskUI() {
@@ -668,13 +990,17 @@ function updateTaskUI() {
         
         const progressPercent = Math.min((task.progress / task.maxProgress) * 100, 100);
         const locationHint = task.requiresLocation ? 
-            `<div style="font-size: 12px; color: #ffd700; margin-top: 5px;">📍 Go to: ${task.requiresLocation === 'lake' ? 'Lake' : 'Kitchen Area'}</div>` : '';
+            `<div style="font-size: 12px; color: #ffd700; margin-top: 5px;">📍 Go to: ${task.requiresLocation === 'lake' ? 'Lake' : task.requiresLocation === 'kitchen' ? 'Kitchen Area' : 'Classroom'}</div>` : '';
+        
+        const rewardText = task.reward && task.reward.decorations ? 
+            `Reward: ${task.reward.decorations.map(d => decorationTypes[d] ? decorationTypes[d].emoji + ' ' + decorationTypes[d].name : d).join(', ')}` :
+            'Reward: Decorations';
         
         taskItem.innerHTML = `
             <div class="task-title">${task.title} - ${task.samiWord}</div>
             <div class="task-description">${task.description}</div>
             ${locationHint}
-            <div class="task-reward">Reward: ${task.reward.xp} XP, ${task.reward.reindeer} Reindeer</div>
+            <div class="task-reward">${rewardText}</div>
             <div class="task-progress">
                 <div class="task-progress-bar" style="width: ${progressPercent}%"></div>
             </div>
@@ -693,6 +1019,12 @@ function startMiniGame(gameType, task, scene) {
         startFishingGame(task, scene);
     } else if (gameType === 'cutting') {
         startCuttingGame(task, scene);
+    } else if (gameType === 'painting') {
+        startPaintingGame(task, scene);
+    } else if (gameType === 'language-quiz') {
+        startLanguageQuiz(task, scene);
+    } else if (gameType === 'history-quiz') {
+        startHistoryQuiz(task, scene);
     }
 }
 
@@ -763,7 +1095,6 @@ function startFishingGame(task, scene) {
                 completeTask(task);
                 overlay.remove();
                 activeMiniGame = null;
-                showReward(`Ice Fishing Complete! +${task.reward.xp} XP`);
                 showEducationalPopup('icefishing');
                 return;
             }
@@ -861,7 +1192,6 @@ function startCuttingGame(task, scene) {
                         completeTask(task);
                         overlay.remove();
                         activeMiniGame = null;
-                        showReward(`Bidos Complete! +${task.reward.xp} XP`);
                         showEducationalPopup('bidos');
                         return;
                     } else {
@@ -881,6 +1211,214 @@ function startCuttingGame(task, scene) {
         overlay.remove();
         activeMiniGame = null;
     });
+}
+
+function startPaintingGame(task, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'painting-minigame';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    `;
+    
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 20px; color: #ffd700;">Paint Traditional Sámi Art - Dáidda</h2>
+        <canvas id="paint-canvas" width="600" height="400" style="border: 3px solid #fff; border-radius: 10px; background: white; cursor: crosshair;"></canvas>
+        <div style="margin-top: 20px; display: flex; gap: 10px; align-items: center;">
+            <input type="color" id="paint-color" value="#FF0000" style="width: 50px; height: 50px; border: none; border-radius: 5px; cursor: pointer;">
+            <button id="clear-canvas" style="padding: 10px 20px; font-size: 16px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Clear</button>
+            <button id="finish-painting" style="padding: 10px 20px; font-size: 16px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Finish Painting</button>
+            <button id="close-painting" style="padding: 10px 20px; font-size: 16px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 14px; opacity: 0.8;">Draw traditional Sámi patterns or designs!</p>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const canvas = document.getElementById('paint-canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    
+    canvas.addEventListener('mousedown', (e) => {
+        isDrawing = true;
+        const rect = canvas.getBoundingClientRect();
+        ctx.beginPath();
+        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+        ctx.stroke();
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+        isDrawing = false;
+    });
+    
+    canvas.addEventListener('mouseleave', () => {
+        isDrawing = false;
+    });
+    
+    document.getElementById('paint-color').addEventListener('change', (e) => {
+        ctx.strokeStyle = e.target.value;
+    });
+    ctx.strokeStyle = document.getElementById('paint-color').value;
+    
+    document.getElementById('clear-canvas').addEventListener('click', () => {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+    
+    document.getElementById('finish-painting').addEventListener('click', () => {
+        task.progress = task.maxProgress;
+        completeTask(task);
+        overlay.remove();
+        activeMiniGame = null;
+        showEducationalPopup('painting');
+    });
+    
+    document.getElementById('close-painting').addEventListener('click', () => {
+        overlay.remove();
+        activeMiniGame = null;
+    });
+}
+
+// Quiz questions
+const languageQuizQuestions = [
+    { question: 'What does "Boazu" mean?', options: ['Reindeer', 'Tent', 'Lake', 'Food'], correct: 0 },
+    { question: 'What does "Lávvu" mean?', options: ['School', 'Tent', 'Reindeer', 'Fish'], correct: 1 },
+    { question: 'What does "Bures boahtin" mean?', options: ['Goodbye', 'Welcome', 'Thank you', 'Hello'], correct: 1 },
+    { question: 'What does "Giella" mean?', options: ['History', 'Art', 'Language', 'School'], correct: 2 },
+    { question: 'What does "Skuvla" mean?', options: ['Kitchen', 'School', 'Lake', 'Tent'], correct: 1 },
+    { question: 'What does "Dáidda" mean?', options: ['Art', 'Food', 'Music', 'Dance'], correct: 0 },
+    { question: 'What does "Gárdi" mean?', options: ['Storage', 'House', 'Tent', 'Farm'], correct: 0 },
+    { question: 'What does "Boazodoallu" mean?', options: ['Fishing', 'Reindeer Herding', 'Cooking', 'Building'], correct: 1 }
+];
+
+const historyQuizQuestions = [
+    { question: 'Where do the Sámi people traditionally live?', options: ['Sápmi (Northern Scandinavia)', 'Southern Europe', 'Asia', 'America'], correct: 0 },
+    { question: 'What is traditional Sámi livelihood?', options: ['Farming', 'Reindeer Herding', 'Fishing Only', 'Trading'], correct: 1 },
+    { question: 'What is the traditional Sámi tent called?', options: ['Tipi', 'Lávvu', 'Yurt', 'Igloo'], correct: 1 },
+    { question: 'How many Sámi languages are there?', options: ['1', '3', '9', '15'], correct: 2 },
+    { question: 'What is traditional Sámi art called?', options: ['Duodji', 'Origami', 'Pottery', 'Weaving'], correct: 0 },
+    { question: 'What color is the Sámi flag?', options: ['Red, Yellow, Green, Blue', 'Blue, Red, Yellow, Green', 'Red, Blue, Green, Yellow', 'Green, Blue, Red, Yellow'], correct: 1 },
+    { question: 'What is the Sámi National Day?', options: ['February 6', 'May 1', 'December 6', 'January 1'], correct: 0 },
+    { question: 'What is traditional Sámi clothing called?', options: ['Gákti', 'Kimono', 'Sari', 'Kilt'], correct: 0 }
+];
+
+function startLanguageQuiz(task, scene) {
+    startQuiz('language-quiz', task, scene, languageQuizQuestions, 'Learn Sámi Language - Giella');
+}
+
+function startHistoryQuiz(task, scene) {
+    startQuiz('history-quiz', task, scene, historyQuizQuestions, 'Learn Sámi History - Historia');
+}
+
+function startQuiz(quizType, task, scene, questions, title) {
+    let currentQuestion = 0;
+    let correctAnswers = task.progress || 0;
+    
+    const overlay = document.createElement('div');
+    overlay.id = `${quizType}-minigame`;
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    `;
+    
+    function showQuestion() {
+        if (currentQuestion >= questions.length || correctAnswers >= task.maxProgress) {
+            completeTask(task);
+            overlay.remove();
+            activeMiniGame = null;
+            if (quizType === 'language-quiz') {
+                showEducationalPopup('classroom');
+            } else {
+                showEducationalPopup('classroom');
+            }
+            return;
+        }
+        
+        const q = questions[currentQuestion];
+        overlay.innerHTML = `
+            <h2 style="margin-bottom: 30px; color: #ffd700; font-size: 28px;">${title}</h2>
+            <div style="background: rgba(30, 30, 40, 0.95); padding: 40px; border-radius: 15px; min-width: 500px; max-width: 700px;">
+                <div style="font-size: 18px; margin-bottom: 10px; color: #ffd700;">Question ${currentQuestion + 1} of ${questions.length}</div>
+                <h3 style="font-size: 24px; margin-bottom: 30px;">${q.question}</h3>
+                <div id="quiz-options" style="display: flex; flex-direction: column; gap: 15px;">
+                    ${q.options.map((opt, idx) => `
+                        <button class="quiz-option" data-index="${idx}" style="padding: 15px 20px; font-size: 18px; background: rgba(102, 126, 234, 0.3); color: white; border: 2px solid #667eea; border-radius: 10px; cursor: pointer; text-align: left; transition: all 0.2s;">
+                            ${opt}
+                        </button>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 20px; font-size: 16px;">Correct answers: ${correctAnswers}/${task.maxProgress}</div>
+            </div>
+            <button id="close-quiz" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+        `;
+        
+        document.querySelectorAll('.quiz-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const selectedIdx = parseInt(e.target.getAttribute('data-index'));
+                const buttons = document.querySelectorAll('.quiz-option');
+                
+                if (selectedIdx === q.correct) {
+                    e.target.style.background = '#27ae60';
+                    e.target.style.borderColor = '#27ae60';
+                    correctAnswers++;
+                    task.progress = correctAnswers;
+                    updateTaskProgress('location', task.target, 0);
+                    
+                    setTimeout(() => {
+                        currentQuestion++;
+                        showQuestion();
+                    }, 1000);
+                } else {
+                    e.target.style.background = '#e74c3c';
+                    e.target.style.borderColor = '#e74c3c';
+                    buttons[q.correct].style.background = '#27ae60';
+                    buttons[q.correct].style.borderColor = '#27ae60';
+                    
+                    setTimeout(() => {
+                        currentQuestion++;
+                        showQuestion();
+                    }, 2000);
+                }
+            });
+        });
+        
+        document.getElementById('close-quiz').addEventListener('click', () => {
+            overlay.remove();
+            activeMiniGame = null;
+        });
+    }
+    
+    document.body.appendChild(overlay);
+    showQuestion();
 }
 
 function showReward(text) {
@@ -905,9 +1443,8 @@ function showEducationalPopup(key) {
 function saveGame() {
     const saveData = {
         level: gameState.level,
-        xp: gameState.xp,
-        xpMax: gameState.xpMax,
-        reindeer: gameState.reindeer,
+        decorations: gameState.decorations,
+        decorationsUnlocked: gameState.decorationsUnlocked,
         buildings: gameState.buildings,
         tasks: gameState.tasks,
         completedTasks: gameState.completedTasks,
@@ -929,6 +1466,14 @@ function loadGame() {
     if (saveData) {
         const data = JSON.parse(saveData);
         gameState = { ...gameState, ...data };
+        
+        // Initialize decorations arrays if missing (for old saves)
+        if (!gameState.decorations) {
+            gameState.decorations = [];
+        }
+        if (!gameState.decorationsUnlocked) {
+            gameState.decorationsUnlocked = [];
+        }
         
         // Migrate tasks if needed (add new properties to old saves)
         if (gameState.tasks && gameState.tasks.length > 0) {
@@ -974,6 +1519,7 @@ document.getElementById('load-btn').addEventListener('click', () => {
 document.getElementById('close-menu-btn').addEventListener('click', toggleMenu);
 document.getElementById('close-building-btn').addEventListener('click', toggleBuildingPanel);
 document.getElementById('close-task-btn').addEventListener('click', toggleTaskPanel);
+document.getElementById('close-decoration-btn').addEventListener('click', toggleDecorationPanel);
 document.getElementById('close-reward-btn').addEventListener('click', () => {
     document.getElementById('reward-popup').classList.add('hidden');
 });
