@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sámi Adventure - Learn Sámi Culture</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-overlay">
+            <div id="top-bar">
+                <div id="player-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Level:</span>
+                        <span id="player-level">1</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Experience:</span>
+                        <span id="player-xp">0</span>/<span id="player-xp-max">100</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Reindeer:</span>
+                        <span id="reindeer-count">0</span>
+                    </div>
+                </div>
+                <div id="save-indicator">Saved!</div>
+            </div>
+            
+            <div id="menu-panel" class="hidden">
+                <h2>Menu</h2>
+                <button id="save-btn" class="menu-btn">Save Game</button>
+                <button id="load-btn" class="menu-btn">Load Game</button>
+                <button id="close-menu-btn" class="menu-btn">Close</button>
+            </div>
+            
+            <div id="building-panel" class="hidden">
+                <h3>Build</h3>
+                <div class="building-options">
+                    <button class="build-btn" data-building="tent">
+                        <div class="build-icon">🏕️</div>
+                        <div class="build-name">Lávvu (Tent)</div>
+                        <div class="build-cost">Cost: 50 XP</div>
+                    </button>
+                    <button class="build-btn" data-building="reindeer-farm">
+                        <div class="build-icon">🦌</div>
+                        <div class="build-name">Boazodoallu (Reindeer Farm)</div>
+                        <div class="build-cost">Cost: 200 XP</div>
+                    </button>
+                    <button class="build-btn" data-building="storage">
+                        <div class="build-icon">📦</div>
+                        <div class="build-name">Gárdi (Storage)</div>
+                        <div class="build-cost">Cost: 100 XP</div>
+                    </button>
+                </div>
+                <button id="close-building-btn" class="menu-btn">Close</button>
+            </div>
+            
+            <div id="task-panel" class="hidden">
+                <h3>Tasks</h3>
+                <div id="task-list"></div>
+                <button id="close-task-btn" class="menu-btn">Close</button>
+            </div>
+            
+            <div id="reward-popup" class="hidden">
+                <div class="reward-content">
+                    <h3>Reward Earned!</h3>
+                    <div id="reward-text"></div>
+                    <button id="close-reward-btn">OK</button>
+                </div>
+            </div>
+            
+            <div id="educational-popup" class="hidden">
+                <div class="edu-content">
+                    <h3 id="edu-title"></h3>
+                    <div id="edu-text"></div>
+                    <div id="edu-sami-word"></div>
+                    <button id="close-edu-btn">Continue</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="controls-hint">
+            <p>Use Arrow Keys or WASD to move | Click to interact | Press M for Menu | Press B to Build</p>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
+

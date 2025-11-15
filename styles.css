@@ -1,0 +1,288 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #87CEEB;
+    border: 3px solid #2c3e50;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+#ui-overlay > * {
+    pointer-events: auto;
+}
+
+#top-bar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 10px;
+    color: white;
+}
+
+#player-stats {
+    display: flex;
+    gap: 20px;
+}
+
+.stat-item {
+    display: flex;
+    gap: 5px;
+    font-size: 14px;
+}
+
+.stat-label {
+    font-weight: bold;
+    color: #ffd700;
+}
+
+#save-indicator {
+    background: #27ae60;
+    padding: 5px 15px;
+    border-radius: 5px;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#save-indicator.show {
+    opacity: 1;
+}
+
+#menu-panel, #building-panel, #task-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(30, 30, 40, 0.95);
+    padding: 30px;
+    border-radius: 15px;
+    color: white;
+    min-width: 400px;
+    max-width: 600px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    z-index: 2000;
+}
+
+#menu-panel h2, #building-panel h3, #task-panel h3 {
+    margin-bottom: 20px;
+    color: #ffd700;
+    text-align: center;
+}
+
+.menu-btn, .build-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    margin: 8px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.menu-btn:hover, .build-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.menu-btn:active, .build-btn:active {
+    transform: translateY(0);
+}
+
+.building-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.build-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: rgba(102, 126, 234, 0.2);
+    border: 2px solid #667eea;
+}
+
+.build-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.build-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+    text-align: center;
+}
+
+.build-cost {
+    font-size: 12px;
+    color: #ffd700;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#task-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.task-item {
+    background: rgba(102, 126, 234, 0.2);
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.task-item.completed {
+    opacity: 0.6;
+    border-left-color: #27ae60;
+}
+
+.task-title {
+    font-weight: bold;
+    color: #ffd700;
+    margin-bottom: 5px;
+}
+
+.task-description {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.task-reward {
+    font-size: 12px;
+    color: #27ae60;
+}
+
+.task-progress {
+    margin-top: 8px;
+    background: rgba(0,0,0,0.3);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.task-progress-bar {
+    background: #27ae60;
+    height: 100%;
+    transition: width 0.3s;
+}
+
+#reward-popup, #educational-popup {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3000;
+}
+
+.reward-content, .edu-content {
+    background: rgba(30, 30, 40, 0.98);
+    padding: 30px;
+    border-radius: 15px;
+    color: white;
+    min-width: 350px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+    border: 3px solid #ffd700;
+}
+
+.reward-content h3, .edu-content h3 {
+    color: #ffd700;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+#reward-text {
+    font-size: 18px;
+    margin-bottom: 20px;
+}
+
+#edu-text {
+    font-size: 16px;
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+#edu-sami-word {
+    font-size: 20px;
+    color: #ffd700;
+    font-weight: bold;
+    margin: 15px 0;
+    padding: 10px;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 8px;
+}
+
+#controls-hint {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 8px;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+/* Scrollbar styling */
+#task-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#task-list::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
+}
+
+#task-list::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 4px;
+}
+
+#task-list::-webkit-scrollbar-thumb:hover {
+    background: #764ba2;
+}
+
