@@ -311,26 +311,96 @@ function preload() {
     playerGraphics.fillRect(8, 36, 4, 8);
     playerGraphics.generateTexture('player-walk2', 32, 48);
     
-    // Create building textures
-    this.add.graphics()
-        .fillStyle(0x8b4513)
-        .fillRect(0, 0, 40, 40)
-        .generateTexture('tent', 40, 40);
+    // Create building textures - Tent (Lávvu) - triangular tent shape
+    const tentGraphics = this.add.graphics();
+    tentGraphics.fillStyle(0x8B4513); // Brown tent
+    tentGraphics.beginPath();
+    tentGraphics.moveTo(20, 5); // Top center
+    tentGraphics.lineTo(5, 35); // Bottom left
+    tentGraphics.lineTo(35, 35); // Bottom right
+    tentGraphics.closePath();
+    tentGraphics.fillPath();
+    // Tent opening
+    tentGraphics.fillStyle(0x654321);
+    tentGraphics.fillRect(15, 25, 10, 10);
+    // Tent poles
+    tentGraphics.lineStyle(2, 0x654321);
+    tentGraphics.lineBetween(20, 5, 20, 35);
+    tentGraphics.lineBetween(5, 35, 20, 5);
+    tentGraphics.lineBetween(35, 35, 20, 5);
+    tentGraphics.generateTexture('tent', 40, 40);
     
-    this.add.graphics()
-        .fillStyle(0x654321)
-        .fillRect(0, 0, 60, 60)
-        .generateTexture('reindeer-farm', 60, 60);
+    // Reindeer Farm - building with roof and fence
+    const farmGraphics = this.add.graphics();
+    // Building base
+    farmGraphics.fillStyle(0x8B7355); // Brown building
+    farmGraphics.fillRect(5, 25, 50, 35);
+    // Roof
+    farmGraphics.fillStyle(0x654321);
+    farmGraphics.beginPath();
+    farmGraphics.moveTo(5, 25);
+    farmGraphics.lineTo(30, 5);
+    farmGraphics.lineTo(55, 25);
+    farmGraphics.closePath();
+    farmGraphics.fillPath();
+    // Door
+    farmGraphics.fillStyle(0x4A2C2A);
+    farmGraphics.fillRect(25, 40, 10, 20);
+    // Windows
+    farmGraphics.fillStyle(0xFFD700, 0.7);
+    farmGraphics.fillRect(12, 30, 8, 8);
+    farmGraphics.fillRect(40, 30, 8, 8);
+    // Fence posts
+    farmGraphics.fillStyle(0x654321);
+    farmGraphics.fillRect(0, 50, 3, 10);
+    farmGraphics.fillRect(57, 50, 3, 10);
+    farmGraphics.generateTexture('reindeer-farm', 60, 60);
     
-    this.add.graphics()
-        .fillStyle(0x696969)
-        .fillRect(0, 0, 50, 50)
-        .generateTexture('storage', 50, 50);
+    // Storage (Gárdi) - building with roof and door
+    const storageGraphics = this.add.graphics();
+    // Building base
+    storageGraphics.fillStyle(0x696969); // Gray building
+    storageGraphics.fillRect(5, 20, 40, 30);
+    // Roof
+    storageGraphics.fillStyle(0x555555);
+    storageGraphics.beginPath();
+    storageGraphics.moveTo(5, 20);
+    storageGraphics.lineTo(25, 5);
+    storageGraphics.lineTo(45, 20);
+    storageGraphics.closePath();
+    storageGraphics.fillPath();
+    // Door
+    storageGraphics.fillStyle(0x4A2C2A);
+    storageGraphics.fillRect(20, 35, 10, 15);
+    // Door handle
+    storageGraphics.fillStyle(0xFFD700);
+    storageGraphics.fillCircle(28, 42, 2);
+    storageGraphics.generateTexture('storage', 50, 50);
     
-    this.add.graphics()
-        .fillStyle(0x228b22)
-        .fillCircle(16, 16, 16)
-        .generateTexture('reindeer', 32, 32);
+    // Reindeer - proper reindeer shape
+    const reindeerGraphics = this.add.graphics();
+    // Body (oval)
+    reindeerGraphics.fillStyle(0x8B7355); // Brown body
+    reindeerGraphics.fillEllipse(16, 20, 20, 14);
+    // Head
+    reindeerGraphics.fillStyle(0x6B5B4A);
+    reindeerGraphics.fillEllipse(16, 8, 10, 8);
+    // Antlers
+    reindeerGraphics.lineStyle(2, 0x654321);
+    reindeerGraphics.lineBetween(12, 6, 8, 2);
+    reindeerGraphics.lineBetween(12, 6, 10, 2);
+    reindeerGraphics.lineBetween(20, 6, 24, 2);
+    reindeerGraphics.lineBetween(20, 6, 22, 2);
+    // Legs (front and back, left and right)
+    reindeerGraphics.fillStyle(0x654321);
+    reindeerGraphics.fillRect(10, 26, 3, 6); // Front left
+    reindeerGraphics.fillRect(19, 26, 3, 6); // Front right
+    reindeerGraphics.fillRect(10, 28, 3, 6); // Back left
+    reindeerGraphics.fillRect(19, 28, 3, 6); // Back right
+    // Eye
+    reindeerGraphics.fillStyle(0x000000);
+    reindeerGraphics.fillCircle(14, 8, 1);
+    reindeerGraphics.generateTexture('reindeer', 32, 32);
     
     // Create location markers
     this.add.graphics()
@@ -348,26 +418,95 @@ function preload() {
         .fillCircle(0, 0, 110)
         .generateTexture('classroom-area', 220, 220);
     
-    // Create decoration textures
-    this.add.graphics()
-        .fillStyle(0x8B4513)
-        .fillRect(0, 0, 30, 30)
-        .generateTexture('decoration-building-small', 30, 30);
+    // Create decoration textures - Small Building
+    const smallBuildingGraphics = this.add.graphics();
+    // Building base
+    smallBuildingGraphics.fillStyle(0x8B4513);
+    smallBuildingGraphics.fillRect(3, 12, 24, 18);
+    // Roof
+    smallBuildingGraphics.fillStyle(0x654321);
+    smallBuildingGraphics.beginPath();
+    smallBuildingGraphics.moveTo(3, 12);
+    smallBuildingGraphics.lineTo(15, 2);
+    smallBuildingGraphics.lineTo(27, 12);
+    smallBuildingGraphics.closePath();
+    smallBuildingGraphics.fillPath();
+    // Window
+    smallBuildingGraphics.fillStyle(0xFFD700, 0.7);
+    smallBuildingGraphics.fillRect(10, 16, 6, 6);
+    // Door
+    smallBuildingGraphics.fillStyle(0x4A2C2A);
+    smallBuildingGraphics.fillRect(12, 22, 6, 8);
+    smallBuildingGraphics.generateTexture('decoration-building-small', 30, 30);
     
-    this.add.graphics()
-        .fillStyle(0x654321)
-        .fillRect(0, 0, 40, 40)
-        .generateTexture('decoration-building-large', 40, 40);
+    // Large Building
+    const largeBuildingGraphics = this.add.graphics();
+    // Building base
+    largeBuildingGraphics.fillStyle(0x654321);
+    largeBuildingGraphics.fillRect(4, 16, 32, 24);
+    // Roof
+    largeBuildingGraphics.fillStyle(0x4A2C2A);
+    largeBuildingGraphics.beginPath();
+    largeBuildingGraphics.moveTo(4, 16);
+    largeBuildingGraphics.lineTo(20, 2);
+    largeBuildingGraphics.lineTo(36, 16);
+    largeBuildingGraphics.closePath();
+    largeBuildingGraphics.fillPath();
+    // Windows
+    largeBuildingGraphics.fillStyle(0xFFD700, 0.7);
+    largeBuildingGraphics.fillRect(8, 20, 6, 6);
+    largeBuildingGraphics.fillRect(26, 20, 6, 6);
+    // Door
+    largeBuildingGraphics.fillStyle(0x2A1A1A);
+    largeBuildingGraphics.fillRect(17, 28, 6, 12);
+    largeBuildingGraphics.generateTexture('decoration-building-large', 40, 40);
     
-    this.add.graphics()
-        .fillStyle(0xFFD700)
-        .fillCircle(0, 0, 15)
-        .generateTexture('decoration-dog', 30, 30);
+    // Dog
+    const dogGraphics = this.add.graphics();
+    // Body
+    dogGraphics.fillStyle(0xFFD700);
+    dogGraphics.fillEllipse(15, 18, 12, 10);
+    // Head
+    dogGraphics.fillEllipse(15, 8, 8, 8);
+    // Ears
+    dogGraphics.fillStyle(0xD4AF37);
+    dogGraphics.fillEllipse(11, 6, 3, 4);
+    dogGraphics.fillEllipse(19, 6, 3, 4);
+    // Legs (front and back, left and right)
+    dogGraphics.fillStyle(0xD4AF37);
+    dogGraphics.fillRect(10, 22, 3, 5); // Front left
+    dogGraphics.fillRect(17, 22, 3, 5); // Front right
+    dogGraphics.fillRect(10, 24, 3, 5); // Back left
+    dogGraphics.fillRect(17, 24, 3, 5); // Back right
+    // Eye
+    dogGraphics.fillStyle(0x000000);
+    dogGraphics.fillCircle(13, 8, 1);
+    dogGraphics.generateTexture('decoration-dog', 30, 30);
     
-    this.add.graphics()
-        .fillStyle(0x8B7355)
-        .fillCircle(0, 0, 18)
-        .generateTexture('decoration-reindeer', 36, 36);
+    // Decoration Reindeer (smaller version)
+    const decReindeerGraphics = this.add.graphics();
+    // Body
+    decReindeerGraphics.fillStyle(0x8B7355);
+    decReindeerGraphics.fillEllipse(18, 22, 16, 12);
+    // Head
+    decReindeerGraphics.fillStyle(0x6B5B4A);
+    decReindeerGraphics.fillEllipse(18, 10, 8, 7);
+    // Antlers
+    decReindeerGraphics.lineStyle(2, 0x654321);
+    decReindeerGraphics.lineBetween(14, 8, 10, 3);
+    decReindeerGraphics.lineBetween(14, 8, 12, 3);
+    decReindeerGraphics.lineBetween(22, 8, 26, 3);
+    decReindeerGraphics.lineBetween(22, 8, 24, 3);
+    // Legs (front and back, left and right)
+    decReindeerGraphics.fillStyle(0x654321);
+    decReindeerGraphics.fillRect(12, 26, 2, 5); // Front left
+    decReindeerGraphics.fillRect(22, 26, 2, 5); // Front right
+    decReindeerGraphics.fillRect(12, 28, 2, 5); // Back left
+    decReindeerGraphics.fillRect(22, 28, 2, 5); // Back right
+    // Eye
+    decReindeerGraphics.fillStyle(0x000000);
+    decReindeerGraphics.fillCircle(16, 10, 1);
+    decReindeerGraphics.generateTexture('decoration-reindeer', 36, 36);
     
     this.add.graphics()
         .fillStyle(0xFF6B6B)
