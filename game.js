@@ -93,36 +93,61 @@ const educationalContent = {
     }
 };
 
-// Location definitions
+// Road grid system
+const GRID_SIZE = 50; // Size of each grid cell
+const ROAD_WIDTH = 40;
+let roadGrid = {}; // Track which cells have roads
+let playerGridX = 8; // Starting grid position (center)
+let playerGridY = 8;
+
+// Location definitions - placed at road ends
 const gameLocations = [
     {
         id: 'lake',
         name: 'Lake',
-        x: 800,
-        y: 600,
-        icon: '🏞️',
+        gridX: 8,
+        gridY: 2, // North end
         color: 0x4169E1,
-        radius: 120
+        radius: 80
     },
     {
         id: 'kitchen',
         name: 'Kitchen Area',
-        x: 1200,
-        y: 400,
-        icon: '🍳',
+        gridX: 15,
+        gridY: 8, // East end
         color: 0xCD853F,
-        radius: 100
+        radius: 80
     },
     {
         id: 'classroom',
         name: 'Classroom',
-        x: 600,
-        y: 800,
-        icon: '🏫',
+        gridX: 1,
+        gridY: 8, // West end
         color: 0x9370DB,
-        radius: 110
+        radius: 80
     }
 ];
+
+// Convert grid coordinates to pixel coordinates
+function gridToPixel(gridX, gridY) {
+    return {
+        x: gridX * GRID_SIZE + GRID_SIZE / 2,
+        y: gridY * GRID_SIZE + GRID_SIZE / 2
+    };
+}
+
+// Convert pixel coordinates to grid coordinates
+function pixelToGrid(x, y) {
+    return {
+        gridX: Math.floor(x / GRID_SIZE),
+        gridY: Math.floor(y / GRID_SIZE)
+    };
+}
+
+// Check if a grid cell has a road
+function hasRoad(gridX, gridY) {
+    return roadGrid[`${gridX},${gridY}`] === true;
+}
 
 // Decoration types
 const decorationTypes = {
@@ -361,74 +386,26 @@ function preload() {
 }
 
 function create() {
-    // Create world background with terrain
-    this.add.rectangle(0, 0, config.width * 2, config.height * 2, 0x87CEEB)
+    // Create world background
+    this.add.rectangle(0, 0, config.width, config.height, 0x87CEEB)
         .setOrigin(0, 0);
     
-    // Add grass patches
-    for (let i = 0; i < 80; i++) {
-        const x = Phaser.Math.Between(0, config.width * 2);
-        const y = Phaser.Math.Between(0, config.height * 2);
-        const size = Phaser.Math.Between(25, 50);
-        this.add.circle(x, y, size, 0x90EE90, 0.4);
-    }
+    // Add mountains in background
+    createMountains(this);
     
-    // Add rocks
-    for (let i = 0; i < 30; i++) {
-        const x = Phaser.Math.Between(0, config.width * 2);
-        const y = Phaser.Math.Between(0, config.height * 2);
-        const size = Phaser.Math.Between(10, 20);
-        this.add.circle(x, y, size, 0x696969, 0.6);
-    }
+    // Add trees in background (not on roads)
+    createTrees(this);
     
-    // Add trees in background
-    for (let i = 0; i < 40; i++) {
-        const x = Phaser.Math.Between(0, config.width * 2);
-        const y = Phaser.Math.Between(0, config.height * 2);
-        const trunkHeight = Phaser.Math.Between(15, 25);
-        const trunkWidth = Phaser.Math.Between(5, 8);
-        this.add.rectangle(x, y, trunkWidth, trunkHeight, 0x8B4513, 0.5);
-        this.add.circle(x, y - trunkHeight/2, Phaser.Math.Between(12, 18), 0x228B22, 0.4);
-    }
+    // Create road system
+    createRoads(this);
     
-    // Add paths connecting locations
-    const pathGraphics = this.add.graphics();
-    pathGraphics.lineStyle(30, 0xD2B48C, 0.6);
-    
-    // Path from start to lake
-    pathGraphics.beginPath();
-    pathGraphics.moveTo(400, 300);
-    pathGraphics.lineTo(800, 600);
-    pathGraphics.strokePath();
-    
-    // Path from lake to kitchen
-    pathGraphics.beginPath();
-    pathGraphics.moveTo(800, 600);
-    pathGraphics.lineTo(1200, 400);
-    pathGraphics.strokePath();
-    
-    // Path from kitchen to classroom
-    pathGraphics.beginPath();
-    pathGraphics.moveTo(1200, 400);
-    pathGraphics.lineTo(600, 800);
-    pathGraphics.strokePath();
-    
-    // Path from classroom to lake
-    pathGraphics.beginPath();
-    pathGraphics.moveTo(600, 800);
-    pathGraphics.lineTo(800, 600);
-    pathGraphics.strokePath();
-    
-    // Create locations
+    // Create locations at road ends
     createLocations(this);
     
-    // Create player with animations
-    player = this.physics.add.sprite(
-        gameState.playerPosition.x,
-        gameState.playerPosition.y,
-        'player-idle'
-    );
-    player.setCollideWorldBounds(true);
+    // Create player with animations at starting position
+    const startPos = gridToPixel(playerGridX, playerGridY);
+    player = this.physics.add.sprite(startPos.x, startPos.y, 'player-idle');
+    player.setCollideWorldBounds(false); // No world bounds, we control movement
     player.setScale(1.5);
     
     // Create walking animation
@@ -445,33 +422,50 @@ function create() {
     });
     
     // Create camera to follow player
-    this.cameras.main.setBounds(0, 0, config.width * 2, config.height * 2);
+    this.cameras.main.setBounds(0, 0, config.width, config.height);
     this.cameras.main.startFollow(player);
     this.cameras.main.setZoom(1);
     
     // Input controls
     cursors = this.input.keyboard.createCursorKeys();
     wasd = this.input.keyboard.addKeys('W,S,A,D');
+    spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     
     // Keyboard shortcuts
     this.input.keyboard.on('keydown-M', () => toggleMenu());
     this.input.keyboard.on('keydown-B', () => toggleBuildingPanel());
     this.input.keyboard.on('keydown-T', () => toggleTaskPanel());
-    this.input.keyboard.on('keydown-D', () => toggleDecorationPanel());
+    this.input.keyboard.on('keydown-E', () => toggleDecorationPanel());
     
-    // Mouse click for building/interaction
+    // Space bar for interaction
+    this.input.keyboard.on('keydown-SPACE', () => {
+        if (!isBuildingMode && !isDecorationMode) {
+            interactAtCurrentLocation(this);
+        }
+    });
+    
+    // Mouse click for building/decoration placement only
     this.input.on('pointerdown', (pointer) => {
         if (isBuildingMode && currentBuildingType) {
-            placeBuilding(this, pointer.worldX, pointer.worldY);
+            const grid = pixelToGrid(pointer.worldX, pointer.worldY);
+            if (hasRoad(grid.gridX, grid.gridY)) {
+                placeBuilding(this, pointer.worldX, pointer.worldY);
+            }
         } else if (isDecorationMode && currentDecorationType) {
             placeDecoration(this, pointer.worldX, pointer.worldY);
-        } else {
-            checkInteractions(this, pointer.worldX, pointer.worldY);
         }
     });
     
     // Load saved game
     loadGame();
+    
+    // Restore player grid position
+    if (gameState.playerPosition && gameState.playerPosition.gridX) {
+        playerGridX = gameState.playerPosition.gridX;
+        playerGridY = gameState.playerPosition.gridY;
+        const pos = gridToPixel(playerGridX, playerGridY);
+        player.setPosition(pos.x, pos.y);
+    }
     
     // Initialize tasks only if not loaded from save
     if (!gameState.tasks || gameState.tasks.length === 0) {
@@ -495,16 +489,67 @@ function create() {
 
 function createLocations(scene) {
     gameLocations.forEach(locData => {
-        // Create location area
-        const location = scene.add.sprite(locData.x, locData.y, locData.id + '-area');
-        location.setAlpha(0.3);
-        location.setInteractive();
-        location.setData('locationId', locData.id);
-        location.setData('locationName', locData.name);
+        const pixelPos = gridToPixel(locData.gridX, locData.gridY);
+        
+        // Create location using shapes
+        let locationShape;
+        if (locData.id === 'lake') {
+            // Create lake shape (blue circle/ellipse)
+            locationShape = scene.add.ellipse(pixelPos.x, pixelPos.y, locData.radius * 2, locData.radius * 1.5, locData.color, 0.8);
+            // Add wave lines
+            for (let i = 0; i < 3; i++) {
+                const wave = scene.add.graphics();
+                wave.lineStyle(3, 0x5B9BD5, 0.6);
+                wave.beginPath();
+                wave.arc(pixelPos.x - locData.radius + i * 30, pixelPos.y, 20, 0, Math.PI * 2);
+                wave.strokePath();
+            }
+        } else if (locData.id === 'kitchen') {
+            // Create kitchen shape (brown rectangle with roof)
+            const kitchenGraphics = scene.add.graphics();
+            kitchenGraphics.fillStyle(locData.color, 0.9);
+            // Building base
+            kitchenGraphics.fillRect(pixelPos.x - 40, pixelPos.y - 20, 80, 50);
+            // Roof (triangle)
+            kitchenGraphics.fillStyle(0x8B4513, 0.9);
+            kitchenGraphics.beginPath();
+            kitchenGraphics.moveTo(pixelPos.x - 45, pixelPos.y - 20);
+            kitchenGraphics.lineTo(pixelPos.x, pixelPos.y - 40);
+            kitchenGraphics.lineTo(pixelPos.x + 45, pixelPos.y - 20);
+            kitchenGraphics.closePath();
+            kitchenGraphics.fillPath();
+            // Door
+            kitchenGraphics.fillStyle(0x654321, 1);
+            kitchenGraphics.fillRect(pixelPos.x - 10, pixelPos.y + 5, 20, 25);
+            locationShape = kitchenGraphics;
+        } else if (locData.id === 'classroom') {
+            // Create school shape (purple rectangle with flag)
+            const schoolGraphics = scene.add.graphics();
+            schoolGraphics.fillStyle(locData.color, 0.9);
+            // Building base
+            schoolGraphics.fillRect(pixelPos.x - 50, pixelPos.y - 30, 100, 70);
+            // Roof
+            schoolGraphics.fillStyle(0x6A5ACD, 0.9);
+            schoolGraphics.fillRect(pixelPos.x - 55, pixelPos.y - 35, 110, 10);
+            // Windows
+            schoolGraphics.fillStyle(0xFFD700, 0.7);
+            schoolGraphics.fillRect(pixelPos.x - 35, pixelPos.y - 15, 20, 20);
+            schoolGraphics.fillRect(pixelPos.x + 15, pixelPos.y - 15, 20, 20);
+            // Door
+            schoolGraphics.fillStyle(0x654321, 1);
+            schoolGraphics.fillRect(pixelPos.x - 10, pixelPos.y + 10, 20, 30);
+            // Flag pole
+            schoolGraphics.lineStyle(3, 0x654321, 1);
+            schoolGraphics.lineBetween(pixelPos.x + 50, pixelPos.y - 30, pixelPos.x + 50, pixelPos.y - 50);
+            // Flag
+            schoolGraphics.fillStyle(0xFF0000, 1);
+            schoolGraphics.fillRect(pixelPos.x + 50, pixelPos.y - 50, 20, 15);
+            locationShape = schoolGraphics;
+        }
         
         // Add location label
-        const label = scene.add.text(locData.x, locData.y - locData.radius - 20, locData.name, {
-            fontSize: '20px',
+        const label = scene.add.text(pixelPos.x, pixelPos.y - locData.radius - 30, locData.name, {
+            fontSize: '18px',
             fill: '#ffffff',
             stroke: '#000000',
             strokeThickness: 3,
@@ -512,56 +557,75 @@ function createLocations(scene) {
         });
         label.setOrigin(0.5);
         
-        // Add icon
-        const icon = scene.add.text(locData.x, locData.y, locData.icon, {
-            fontSize: '40px',
-            fontFamily: 'Arial'
-        });
-        icon.setOrigin(0.5);
-        
         locations.push({
-            sprite: location,
+            sprite: locationShape,
             label: label,
-            icon: icon,
-            data: locData
+            data: { ...locData, x: pixelPos.x, y: pixelPos.y }
         });
     });
 }
 
+let moveCooldown = 0;
+const MOVE_COOLDOWN_TIME = 200; // milliseconds between moves
+
 function update() {
-    // Player movement
-    const speed = 200;
-    let isMoving = false;
-    player.setVelocity(0);
-    
-    if (cursors.left.isDown || wasd.A.isDown) {
-        player.setVelocityX(-speed);
-        isMoving = true;
-    } else if (cursors.right.isDown || wasd.D.isDown) {
-        player.setVelocityX(speed);
-        isMoving = true;
+    // Grid-based movement on roads only
+    if (moveCooldown > 0) {
+        moveCooldown -= this.game.loop.delta;
     }
     
-    if (cursors.up.isDown || wasd.W.isDown) {
-        player.setVelocityY(-speed);
-        isMoving = true;
-    } else if (cursors.down.isDown || wasd.S.isDown) {
-        player.setVelocityY(speed);
-        isMoving = true;
+    let moved = false;
+    let targetGridX = playerGridX;
+    let targetGridY = playerGridY;
+    
+    if (moveCooldown <= 0) {
+        if (cursors.left.isDown || wasd.A.isDown) {
+            targetGridX = playerGridX - 1;
+            moved = true;
+        } else if (cursors.right.isDown || wasd.D.isDown) {
+            targetGridX = playerGridX + 1;
+            moved = true;
+        } else if (cursors.up.isDown || wasd.W.isDown) {
+            targetGridY = playerGridY - 1;
+            moved = true;
+        } else if (cursors.down.isDown || wasd.S.isDown) {
+            targetGridY = playerGridY + 1;
+            moved = true;
+        }
+        
+        // Only move if target cell has a road
+        if (moved && hasRoad(targetGridX, targetGridY)) {
+            playerGridX = targetGridX;
+            playerGridY = targetGridY;
+            moveCooldown = MOVE_COOLDOWN_TIME;
+            
+            // Animate movement
+            const targetPos = gridToPixel(playerGridX, playerGridY);
+            this.tweens.add({
+                targets: player,
+                x: targetPos.x,
+                y: targetPos.y,
+                duration: MOVE_COOLDOWN_TIME,
+                ease: 'Linear'
+            });
+            
+            // Play walking animation
+            if (!player.anims.isPlaying) {
+                player.anims.play('walk', true);
+            }
+        }
     }
     
-    // Handle animations
-    if (isMoving && !player.anims.isPlaying) {
-        player.anims.play('walk', true);
-    } else if (!isMoving && player.anims.isPlaying) {
+    // Stop animation when not moving
+    if (!moved && player.anims.isPlaying) {
         player.anims.stop();
         player.setTexture('player-idle');
     }
     
     // Update player position in state
-    gameState.playerPosition = { x: player.x, y: player.y };
+    gameState.playerPosition = { gridX: playerGridX, gridY: playerGridY };
     
-    // Check if player is near locations
+    // Check if player is at a location
     checkLocationProximity();
     
     // Auto-save every 30 seconds
@@ -570,20 +634,125 @@ function update() {
     }
 }
 
+function createRoads(scene) {
+    const roadGraphics = scene.add.graphics();
+    roadGraphics.fillStyle(0xD2B48C, 1);
+    
+    const centerX = 8;
+    const centerY = 8;
+    
+    // Horizontal road (center to east and west)
+    for (let x = 1; x <= 15; x++) {
+        roadGrid[`${x},${centerY}`] = true;
+        roadGraphics.fillRect(x * GRID_SIZE - ROAD_WIDTH/2, centerY * GRID_SIZE - ROAD_WIDTH/2, ROAD_WIDTH, ROAD_WIDTH);
+    }
+    
+    // Vertical road (center to north and south)
+    for (let y = 2; y <= 14; y++) {
+        roadGrid[`${centerX},${y}`] = true;
+        roadGraphics.fillRect(centerX * GRID_SIZE - ROAD_WIDTH/2, y * GRID_SIZE - ROAD_WIDTH/2, ROAD_WIDTH, ROAD_WIDTH);
+    }
+    
+    // Add location cells to road grid so player can reach them
+    gameLocations.forEach(loc => {
+        roadGrid[`${loc.gridX},${loc.gridY}`] = true;
+    });
+}
+
+function createMountains(scene) {
+    // Create mountain shapes in background
+    const mountains = [
+        { x: 100, y: 100, width: 200, height: 150 },
+        { x: 300, y: 80, width: 180, height: 140 },
+        { x: 500, y: 120, width: 220, height: 160 },
+        { x: 1200, y: 100, width: 200, height: 150 },
+        { x: 1000, y: 80, width: 180, height: 140 },
+        { x: 100, y: 600, width: 200, height: 150 },
+        { x: 300, y: 580, width: 180, height: 140 },
+        { x: 1200, y: 600, width: 200, height: 150 },
+    ];
+    
+    mountains.forEach(m => {
+        // Create triangular mountain shape
+        const mountain = scene.add.graphics();
+        mountain.fillStyle(0x696969, 0.7);
+        mountain.beginPath();
+        mountain.moveTo(m.x, m.y + m.height);
+        mountain.lineTo(m.x + m.width/2, m.y);
+        mountain.lineTo(m.x + m.width, m.y + m.height);
+        mountain.closePath();
+        mountain.fillPath();
+        
+        // Add snow cap
+        const snow = scene.add.graphics();
+        snow.fillStyle(0xFFFFFF, 0.8);
+        snow.beginPath();
+        snow.moveTo(m.x + m.width/2 - 30, m.y + 20);
+        snow.lineTo(m.x + m.width/2, m.y);
+        snow.lineTo(m.x + m.width/2 + 30, m.y + 20);
+        snow.closePath();
+        snow.fillPath();
+    });
+}
+
+function createTrees(scene) {
+    // Create trees avoiding road areas
+    const treePositions = [
+        { x: 150, y: 200 }, { x: 250, y: 180 }, { x: 350, y: 220 },
+        { x: 550, y: 200 }, { x: 650, y: 180 }, { x: 750, y: 220 },
+        { x: 950, y: 200 }, { x: 1050, y: 180 }, { x: 1150, y: 220 },
+        { x: 150, y: 500 }, { x: 250, y: 480 }, { x: 350, y: 520 },
+        { x: 550, y: 500 }, { x: 750, y: 480 }, { x: 850, y: 520 },
+        { x: 950, y: 500 }, { x: 1050, y: 480 }, { x: 1150, y: 520 },
+    ];
+    
+    treePositions.forEach(pos => {
+        const grid = pixelToGrid(pos.x, pos.y);
+        // Only place trees where there's no road
+        if (!hasRoad(grid.gridX, grid.gridY)) {
+            // Trunk
+            scene.add.rectangle(pos.x, pos.y, 12, 30, 0x8B4513, 0.8);
+            // Leaves (circle)
+            scene.add.circle(pos.x, pos.y - 15, 25, 0x228B22, 0.7);
+        }
+    });
+}
+
+function interactAtCurrentLocation(scene) {
+    // Check if player is at a location
+    locations.forEach(loc => {
+        if (playerGridX === loc.data.gridX && playerGridY === loc.data.gridY) {
+            interactWithLocation(loc.data.id, scene);
+        }
+    });
+    
+    // Check if player is near a building
+    buildings.forEach(building => {
+        const buildingGrid = pixelToGrid(building.x, building.y);
+        if (playerGridX === buildingGrid.gridX && playerGridY === buildingGrid.gridY) {
+            const type = building.getData('type');
+            interactWithBuilding(type);
+        }
+    });
+}
+
 function checkLocationProximity() {
     locations.forEach(loc => {
-        const distance = Phaser.Math.Distance.Between(
-            player.x, player.y,
-            loc.data.x, loc.data.y
-        );
-        
-        if (distance < loc.data.radius + 20) {
-            // Player is near location - highlight it
-            loc.sprite.setAlpha(0.6);
-            loc.label.setStyle({ fill: '#ffd700' });
+        if (playerGridX === loc.data.gridX && playerGridY === loc.data.gridY) {
+            // Player is at location - highlight it
+            if (loc.sprite && loc.sprite.setAlpha) {
+                loc.sprite.setAlpha(1);
+            }
+            if (loc.label) {
+                loc.label.setStyle({ fill: '#ffd700', fontSize: '20px' });
+            }
         } else {
-            loc.sprite.setAlpha(0.3);
-            loc.label.setStyle({ fill: '#ffffff' });
+            if (loc.sprite && loc.sprite.setAlpha) {
+                loc.sprite.setAlpha(0.8);
+            }
+            if (loc.label) {
+                loc.label.setStyle({ fill: '#ffffff', fontSize: '18px' });
+            }
         }
     });
 }
@@ -601,15 +770,21 @@ function toggleBuildingPanel() {
 function placeBuilding(scene, x, y) {
     if (!currentBuildingType) return;
     
-    // Check if too close to other buildings
-    const minDistance = 100;
+    const grid = pixelToGrid(x, y);
+    
+    // Check if too close to other buildings (same grid cell)
     for (let building of buildings) {
-        const distance = Phaser.Math.Distance.Between(x, y, building.x, building.y);
-        if (distance < minDistance) {
-            alert('Too close to another building!');
+        const buildingGrid = pixelToGrid(building.x, building.y);
+        if (grid.gridX === buildingGrid.gridX && grid.gridY === buildingGrid.gridY) {
+            alert('A building is already here!');
             return;
         }
     }
+    
+    // Place at grid center
+    const gridPos = gridToPixel(grid.gridX, grid.gridY);
+    x = gridPos.x;
+    y = gridPos.y;
     
     // Create building sprite
     const building = scene.physics.add.sprite(x, y, currentBuildingType);
@@ -759,34 +934,7 @@ function loadBuildings(scene) {
     });
 }
 
-// Interaction System
-function checkInteractions(scene, x, y) {
-    // Check location interactions first
-    locations.forEach(loc => {
-        const distance = Phaser.Math.Distance.Between(
-            player.x, player.y,
-            loc.data.x, loc.data.y
-        );
-        
-        if (distance < loc.data.radius + 30) {
-            interactWithLocation(loc.data.id, scene);
-            return;
-        }
-    });
-    
-    // Check building interactions
-    buildings.forEach(building => {
-        const distance = Phaser.Math.Distance.Between(
-            player.x, player.y,
-            building.x, building.y
-        );
-        
-        if (distance < 80) {
-            const type = building.getData('type');
-            interactWithBuilding(type);
-        }
-    });
-}
+// Interaction System - now handled by space bar in update()
 
 function interactWithLocation(locationId, scene) {
     if (locationId === 'classroom') {
@@ -953,7 +1101,7 @@ function completeTask(task) {
 
 function showDecorationReward(decorationTypes) {
     setTimeout(() => {
-        const message = `You can now place these decorations! Press D to open the decoration menu.`;
+        const message = `You can now place these decorations! Press E to open the decoration menu.`;
         alert(message);
     }, 2000);
 }
