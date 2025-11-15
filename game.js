@@ -18,31 +18,32 @@ const config = {
     }
 };
 
-// Game State
+// Game State - Sámi Quest: Guardians of Sápmi
 let gameState = {
     level: 1,
-    decorations: [], // Decorative items placed in the city
-    decorationsUnlocked: [], // Available decorations to place
-    buildings: [],
-    tasks: [],
-    completedTasks: [],
-    playerPosition: { x: 400, y: 300 }
+    chapter: 1, // Story chapters
+    artifacts: [], // Collected artifacts: runebomme, reindeer-amulet, traditional-patterns, etc.
+    culturalTokens: 0, // Cultural Knowledge Tokens earned
+    quests: [], // Active quests
+    completedQuests: [],
+    playerPosition: { x: 400, y: 300 },
+    storyProgress: 0, // Overall story progress (0-100)
+    charactersMet: [], // NPCs the player has met
+    locationsVisited: [] // Locations discovered
 };
 
 // Game Objects
 let player;
 let cursors;
 let wasd;
-let buildings = [];
+let npcs = []; // Non-player characters
 let interactables = [];
 let locations = [];
-let decorations = [];
-let currentBuildingType = null;
-let currentDecorationType = null;
-let isBuildingMode = false;
-let isDecorationMode = false;
+let artifactSprites = []; // Artifact sprites in world
 let activeMiniGame = null;
 let sceneRef = null;
+let currentDialogue = null;
+let storyMode = false; // Whether player is in story/dialogue mode
 
 // Educational Content
 const educationalContent = {
@@ -87,9 +88,34 @@ const educationalContent = {
         samiWord: "Bidos (Traditional Stew)"
     },
     welcome: {
-        title: "Welcome to Sámi Adventure!",
-        text: "Learn about Sámi culture and language while building your own Sámi settlement. Complete tasks to earn rewards and discover more about this rich culture!",
+        title: "Welcome to Sámi Quest: Guardians of Sápmi!",
+        text: "You are a Yoik Guardian Apprentice, chosen to help protect Sápmi's cultural treasures. Ancient Sámi artifacts have been scattered across the land. Your quest is to find them by learning about Sámi culture, solving puzzles, and meeting the people of Sápmi. Each artifact you collect brings you closer to restoring the magical runebomme!",
         samiWord: "Bures boahtin! (Welcome!)"
+    },
+    runebomme: {
+        title: "Runebomme - The Sacred Drum",
+        text: "The runebomme (also called goavddis) is a traditional Sámi drum used by noaidi (shamans) for spiritual practices. It is decorated with symbols representing the Sámi worldview. This artifact represents the spiritual connection to Sápmi.",
+        samiWord: "Runebomme (Sacred Drum)"
+    },
+    reindeerAmulet: {
+        title: "Reindeer Amulet",
+        text: "Reindeer are central to Sámi life. This amulet represents the deep connection between the Sámi people and their reindeer herds. Reindeer provide food, clothing, tools, and are essential to traditional Sámi livelihood.",
+        samiWord: "Boazu (Reindeer)"
+    },
+    traditionalPattern: {
+        title: "Traditional Sámi Patterns",
+        text: "Duodji (Sámi handicrafts) include beautiful traditional patterns used in clothing (gákti), belts, and other items. Each pattern has meaning and is passed down through generations. These patterns represent Sámi identity and artistry.",
+        samiWord: "Duodji (Handicrafts)"
+    },
+    yoik: {
+        title: "Joik - Sámi Musical Tradition",
+        text: "Joik (yoik) is a traditional Sámi form of song. It is not a song about something, but rather a way of expressing a person, place, or feeling. Joik is deeply personal and spiritual, connecting the singer to their subject. It is an important part of Sámi cultural identity.",
+        samiWord: "Joik (Yoik)"
+    },
+    sapmi: {
+        title: "Sápmi - The Sámi Homeland",
+        text: "Sápmi is the traditional homeland of the Sámi people, spanning across northern Norway, Sweden, Finland, and Russia's Kola Peninsula. The Sámi are the only Indigenous people of Europe. Sápmi is not a country, but a cultural region where Sámi people have lived for thousands of years.",
+        samiWord: "Sápmi (Sámi Homeland)"
     }
 };
 
@@ -160,115 +186,263 @@ const decorationTypes = {
     'fire': { name: 'Campfire', icon: '🔥', emoji: '🔥' }
 };
 
-// Tasks System
-const availableTasks = [
-    {
-        id: 'build-tent',
-        title: 'Build Your First Lávvu',
-        description: 'Build a traditional Sámi tent (lávvu) to learn about Sámi housing.',
-        samiWord: 'Lávvu',
-        progress: 0,
-        maxProgress: 1,
-        reward: { decorations: ['building-small', 'tree'] },
-        type: 'build',
-        target: 'tent',
-        requiresLocation: null
+// Artifact Definitions
+const artifacts = {
+    'runebomme': {
+        id: 'runebomme',
+        name: 'Runebomme Drum',
+        description: 'The sacred drum that connects to Sápmi\'s spiritual heritage',
+        chapter: 7, // Final artifact
+        challengeType: 'final-quest'
     },
-    {
-        id: 'ice-fishing',
-        title: 'Go Ice Fishing',
-        description: 'Go to the lake and catch fish through the ice. Click on the lake when you are nearby!',
-        samiWord: 'Jiekŋaguollevuohta',
-        progress: 0,
-        maxProgress: 3,
-        reward: { decorations: ['reindeer', 'dog'] },
-        type: 'location',
-        target: 'lake',
-        requiresLocation: 'lake',
-        miniGame: 'fishing'
+    'reindeer-amulet': {
+        id: 'reindeer-amulet',
+        name: 'Reindeer Amulet',
+        description: 'Represents the bond between Sámi people and reindeer',
+        chapter: 2,
+        challengeType: 'reindeer-herding'
     },
+    'traditional-patterns': {
+        id: 'traditional-patterns',
+        name: 'Traditional Patterns',
+        description: 'Sacred duodji patterns passed down through generations',
+        chapter: 3,
+        challengeType: 'duodji-crafting'
+    },
+    'language-stone': {
+        id: 'language-stone',
+        name: 'Language Stone',
+        description: 'Carved with ancient Sámi words and meanings',
+        chapter: 1,
+        challengeType: 'language-puzzle'
+    },
+    'yoik-crystal': {
+        id: 'yoik-crystal',
+        name: 'Yoik Crystal',
+        description: 'Resonates with the melodies of Sámi musical tradition',
+        chapter: 4,
+        challengeType: 'yoik-puzzle'
+    },
+    'environmental-seed': {
+        id: 'environmental-seed',
+        name: 'Environmental Seed',
+        description: 'Represents traditional ecological knowledge',
+        chapter: 5,
+        challengeType: 'environmental-challenge'
+    },
+    'history-scroll': {
+        id: 'history-scroll',
+        name: 'History Scroll',
+        description: 'Contains the timeline of Sámi history',
+        chapter: 6,
+        challengeType: 'history-timeline'
+    }
+};
+
+// Quest System - Story-driven quests
+const availableQuests = [
     {
-        id: 'make-bidos',
-        title: 'Make Bidos (Traditional Stew)',
-        description: 'Go to the kitchen area and prepare bidos by cutting vegetables. Click on the kitchen when nearby!',
-        samiWord: 'Bidos',
+        id: 'quest-1-language',
+        title: 'The Language Stone',
+        description: 'Meet Elder Ánne at the village. She will teach you Sámi words to unlock the Language Stone artifact.',
+        samiWord: 'Giella (Language)',
+        chapter: 1,
+        artifact: 'language-stone',
+        challengeType: 'language-puzzle',
+        location: 'village',
+        npc: 'elder-anne',
         progress: 0,
         maxProgress: 5,
-        reward: { decorations: ['building-small', 'fire'] },
-        type: 'location',
-        target: 'kitchen',
-        requiresLocation: 'kitchen',
-        miniGame: 'cutting'
+        reward: { tokens: 10, artifact: 'language-stone' }
     },
     {
-        id: 'paint',
-        title: 'Paint Traditional Art',
-        description: 'Go to the classroom and create traditional Sámi art. Click on the classroom when nearby!',
-        samiWord: 'Dáidda',
+        id: 'quest-2-reindeer',
+        title: 'The Reindeer Amulet',
+        description: 'Help reindeer herder Máret guide her herd to safety. Learn about reindeer herding to earn the Reindeer Amulet.',
+        samiWord: 'Boazodoallu (Reindeer Herding)',
+        chapter: 2,
+        artifact: 'reindeer-amulet',
+        challengeType: 'reindeer-herding',
+        location: 'tundra',
+        npc: 'herder-maret',
         progress: 0,
         maxProgress: 1,
-        reward: { decorations: ['human', 'tree'] },
-        type: 'location',
-        target: 'classroom',
-        requiresLocation: 'classroom',
-        miniGame: 'painting'
+        reward: { tokens: 15, artifact: 'reindeer-amulet' }
     },
     {
-        id: 'language-quiz',
-        title: 'Learn Sámi Language',
-        description: 'Go to the classroom and take a quiz to learn Sámi words. Click on the classroom when nearby!',
-        samiWord: 'Giella',
-        progress: 0,
-        maxProgress: 5,
-        reward: { decorations: ['building-small', 'dog'] },
-        type: 'location',
-        target: 'classroom',
-        requiresLocation: 'classroom',
-        miniGame: 'language-quiz'
-    },
-    {
-        id: 'history-quiz',
-        title: 'Learn Sámi History',
-        description: 'Go to the classroom and take a quiz about Sámi history. Click on the classroom when nearby!',
-        samiWord: 'Historia',
-        progress: 0,
-        maxProgress: 5,
-        reward: { decorations: ['building-large', 'reindeer'] },
-        type: 'location',
-        target: 'classroom',
-        requiresLocation: 'classroom',
-        miniGame: 'history-quiz'
-    },
-    {
-        id: 'build-storage',
-        title: 'Create Storage',
-        description: 'Build a gárdi (storage) to store your supplies.',
-        samiWord: 'Gárdi',
+        id: 'quest-3-duodji',
+        title: 'Traditional Patterns',
+        description: 'Visit the duodji workshop and learn to craft traditional Sámi patterns with craftsperson Nils.',
+        samiWord: 'Duodji (Handicrafts)',
+        chapter: 3,
+        artifact: 'traditional-patterns',
+        challengeType: 'duodji-crafting',
+        location: 'workshop',
+        npc: 'craftsperson-nils',
         progress: 0,
         maxProgress: 1,
-        reward: { decorations: ['building-small', 'fire'] },
-        type: 'build',
-        target: 'storage',
-        requiresLocation: null
+        reward: { tokens: 15, artifact: 'traditional-patterns' }
     },
     {
-        id: 'build-farm',
-        title: 'Start Reindeer Herding',
-        description: 'Build a reindeer farm (boazodoallu) to begin your reindeer herd.',
-        samiWord: 'Boazodoallu',
+        id: 'quest-4-yoik',
+        title: 'The Yoik Crystal',
+        description: 'Learn about joik from musician Elle. Understand the rhythm and meaning of Sámi music.',
+        samiWord: 'Joik (Yoik)',
+        chapter: 4,
+        artifact: 'yoik-crystal',
+        challengeType: 'yoik-puzzle',
+        location: 'music-hut',
+        npc: 'musician-elle',
         progress: 0,
         maxProgress: 1,
-        reward: { decorations: ['reindeer', 'reindeer', 'building-large'] },
-        type: 'build',
-        target: 'reindeer-farm',
-        requiresLocation: null
+        reward: { tokens: 15, artifact: 'yoik-crystal' }
+    },
+    {
+        id: 'quest-5-environmental',
+        title: 'The Environmental Seed',
+        description: 'Help fisherman Jovnna balance fishing, grazing, and resources to preserve the natural area.',
+        samiWord: 'Eallin (Life/Environment)',
+        chapter: 5,
+        artifact: 'environmental-seed',
+        challengeType: 'environmental-challenge',
+        location: 'lake',
+        npc: 'fisherman-jovnna',
+        progress: 0,
+        maxProgress: 1,
+        reward: { tokens: 20, artifact: 'environmental-seed' }
+    },
+    {
+        id: 'quest-6-history',
+        title: 'The History Scroll',
+        description: 'Travel through time portals and place key events in Sámi history on the timeline.',
+        samiWord: 'Historia (History)',
+        chapter: 6,
+        artifact: 'history-scroll',
+        challengeType: 'history-timeline',
+        location: 'time-portal',
+        npc: 'historian-sara',
+        progress: 0,
+        maxProgress: 1,
+        reward: { tokens: 20, artifact: 'history-scroll' }
+    },
+    {
+        id: 'quest-7-final',
+        title: 'Restore the Runebomme',
+        description: 'With all artifacts collected, restore the magical runebomme and complete your journey as a Yoik Guardian.',
+        samiWord: 'Runebomme (Sacred Drum)',
+        chapter: 7,
+        artifact: 'runebomme',
+        challengeType: 'final-quest',
+        location: 'sacred-site',
+        npc: 'guardian-leader',
+        progress: 0,
+        maxProgress: 1,
+        reward: { tokens: 50, artifact: 'runebomme' },
+        requiresArtifacts: ['language-stone', 'reindeer-amulet', 'traditional-patterns', 'yoik-crystal', 'environmental-seed', 'history-scroll']
     }
 ];
 
-// Initialize tasks
-function initializeTasks() {
-    gameState.tasks = availableTasks.map(task => ({ ...task }));
+// Initialize quests
+function initializeQuests() {
+    gameState.quests = availableQuests
+        .filter(quest => quest.chapter === gameState.chapter)
+        .map(quest => ({ ...quest }));
 }
+
+// NPC Character Definitions
+const npcCharacters = {
+    'elder-anne': {
+        id: 'elder-anne',
+        name: 'Elder Ánne',
+        role: 'Language Teacher',
+        description: 'A wise elder who teaches the Sámi language',
+        location: 'village',
+        dialogue: {
+            greeting: "Bures! I am Ánne. I see you are a Yoik Guardian Apprentice. To find the Language Stone, you must learn our words. Are you ready?",
+            questStart: "Good! I will teach you Sámi words. Match each word to its meaning, and you will unlock the Language Stone.",
+            questComplete: "Excellent! You have learned well. The Language Stone is yours. It will help you understand more about our culture."
+        },
+        appearance: { color: 0x8B4513, emoji: '👵' }
+    },
+    'herder-maret': {
+        id: 'herder-maret',
+        name: 'Máret',
+        role: 'Reindeer Herder',
+        description: 'A skilled reindeer herder who knows the ways of the tundra',
+        location: 'tundra',
+        dialogue: {
+            greeting: "Bures! I am Máret. My reindeer need to reach the grazing area, but there are dangers. Can you help guide them?",
+            questStart: "Reindeer herding is about understanding the land, seasons, and the herd. Guide my reindeer safely, and you will earn the Reindeer Amulet.",
+            questComplete: "You understand the ways of reindeer herding! The Reindeer Amulet recognizes your knowledge."
+        },
+        appearance: { color: 0x4169E1, emoji: '👩' }
+    },
+    'craftsperson-nils': {
+        id: 'craftsperson-nils',
+        name: 'Nils',
+        role: 'Duodji Craftsperson',
+        description: 'A master of traditional Sámi handicrafts',
+        location: 'workshop',
+        dialogue: {
+            greeting: "Bures! I am Nils. I create duodji - traditional Sámi handicrafts. Each pattern tells a story. Would you like to learn?",
+            questStart: "To earn the Traditional Patterns artifact, you must create a piece of duodji. Assemble the pattern pieces correctly.",
+            questComplete: "Beautiful work! You understand the meaning in our patterns. The Traditional Patterns artifact is yours."
+        },
+        appearance: { color: 0xFF6347, emoji: '👨' }
+    },
+    'musician-elle': {
+        id: 'musician-elle',
+        name: 'Elle',
+        role: 'Joik Musician',
+        description: 'A musician who shares the tradition of joik',
+        location: 'music-hut',
+        dialogue: {
+            greeting: "Bures! I am Elle. Joik is not a song about something - it IS something. It connects us to people, places, and feelings.",
+            questStart: "Learn the rhythm and pattern of joik. When you understand its essence, the Yoik Crystal will respond to you.",
+            questComplete: "You feel the joik in your heart. The Yoik Crystal resonates with your understanding."
+        },
+        appearance: { color: 0x9370DB, emoji: '🎵' }
+    },
+    'fisherman-jovnna': {
+        id: 'fisherman-jovnna',
+        name: 'Jovnna',
+        role: 'Fisherman',
+        description: 'A fisherman who understands the balance of nature',
+        location: 'lake',
+        dialogue: {
+            greeting: "Bures! I am Jovnna. The land gives us what we need, but we must take care of it. Balance is everything.",
+            questStart: "Help me balance fishing, grazing, and resources. Traditional knowledge teaches us to respect the land. Complete this challenge to earn the Environmental Seed.",
+            questComplete: "You understand traditional ecological knowledge! The Environmental Seed recognizes your wisdom."
+        },
+        appearance: { color: 0x20B2AA, emoji: '🎣' }
+    },
+    'historian-sara': {
+        id: 'historian-sara',
+        name: 'Sara',
+        role: 'Historian',
+        description: 'A keeper of Sámi history and stories',
+        location: 'time-portal',
+        dialogue: {
+            greeting: "Bures! I am Sara. History is not just the past - it shapes who we are today. Come, travel through time with me.",
+            questStart: "Place the key events of Sámi history in the correct order on the timeline. Understanding our past will unlock the History Scroll.",
+            questComplete: "You understand our history! The History Scroll contains the knowledge you have gained."
+        },
+        appearance: { color: 0xFFD700, emoji: '📚' }
+    },
+    'guardian-leader': {
+        id: 'guardian-leader',
+        name: 'Guardian Leader',
+        role: 'Yoik Guardian Leader',
+        description: 'The leader of the Yoik Guardians',
+        location: 'sacred-site',
+        dialogue: {
+            greeting: "Welcome, apprentice. You have collected all the artifacts. Now, restore the runebomme and complete your journey.",
+            questStart: "With all artifacts united, the runebomme can be restored. This will complete your training as a Yoik Guardian.",
+            questComplete: "Congratulations! You have restored the runebomme and become a true Yoik Guardian. Sápmi's cultural treasures are safe in your hands."
+        },
+        appearance: { color: 0xFF4500, emoji: '🛡️' }
+    }
+};
 
 // Phaser Game Functions
 function preload() {
@@ -606,9 +780,9 @@ function create() {
         player.setPosition(pos.x, pos.y);
     }
     
-    // Initialize tasks only if not loaded from save
-    if (!gameState.tasks || gameState.tasks.length === 0) {
-        initializeTasks();
+    // Initialize quests only if not loaded from save
+    if (!gameState.quests || gameState.quests.length === 0) {
+        initializeQuests();
     }
     
     // Load existing buildings
@@ -1076,32 +1250,42 @@ function loadBuildings(scene) {
 // Interaction System - now handled by space bar in update()
 
 function interactWithLocation(locationId, scene) {
-    if (locationId === 'classroom') {
-        // Show classroom activity selection
-        showClassroomMenu(scene);
-        return;
-    }
-    
-    // Find active tasks that require this location
-    const activeTasks = gameState.tasks.filter(task => 
-        !task.completed && 
-        task.requiresLocation === locationId
+    // Find quests that require this location
+    const activeQuests = gameState.quests.filter(quest => 
+        !quest.completed && 
+        quest.location === locationId
     );
     
-    if (activeTasks.length === 0) {
-        // No active tasks for this location
-        if (locationId === 'lake') {
-            showEducationalPopup('icefishing');
-        } else if (locationId === 'kitchen') {
-            showEducationalPopup('bidos');
+    if (activeQuests.length > 0) {
+        // Find NPC for this quest
+        const quest = activeQuests[0];
+        if (quest.npc) {
+            showNPCDialogue(quest.npc, quest);
+            return;
         }
+    }
+    
+    // Check if there's an NPC at this location (for general interaction)
+    const npcAtLocation = Object.values(npcCharacters).find(npc => npc.location === locationId);
+    if (npcAtLocation) {
+        // Find associated quest
+        const associatedQuest = gameState.quests.find(q => q.npc === npcAtLocation.id);
+        showNPCDialogue(npcAtLocation.id, associatedQuest);
         return;
     }
     
-    // Start the mini-game for the first active task
-    const task = activeTasks[0];
-    if (task.miniGame) {
-        startMiniGame(task.miniGame, task, scene);
+    // Fallback: show educational content for location
+    if (locationId === 'lake') {
+        showEducationalPopup('icefishing');
+    } else if (locationId === 'kitchen') {
+        showEducationalPopup('bidos');
+    } else if (locationId === 'classroom') {
+        showClassroomMenu(scene);
+    } else {
+        // Track location visit
+        if (!gameState.locationsVisited.includes(locationId)) {
+            gameState.locationsVisited.push(locationId);
+        }
     }
 }
 
@@ -1253,65 +1437,923 @@ function toggleMenu() {
 
 function toggleTaskPanel() {
     const panel = document.getElementById('task-panel');
-    panel.classList.toggle('hidden');
-    if (!panel.classList.contains('hidden')) {
-        updateTaskUI();
+    if (panel) {
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) {
+            updateQuestUI();
+        }
+    }
+}
+
+// NPC Dialogue System
+function showNPCDialogue(npcId, quest) {
+    const npc = npcCharacters[npcId];
+    if (!npc) return;
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'npc-dialogue';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85); z-index: 4000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    let dialogueText = npc.dialogue.greeting;
+    if (quest && quest.completed) {
+        dialogueText = npc.dialogue.questComplete;
+    } else if (quest) {
+        dialogueText = npc.dialogue.questStart;
+    }
+    
+    overlay.innerHTML = `
+        <div style="background: rgba(30, 30, 40, 0.95); padding: 40px; border-radius: 15px; max-width: 600px; border: 3px solid #667eea;">
+            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                <div style="font-size: 64px; margin-right: 20px;">${npc.appearance.emoji}</div>
+                <div>
+                    <h2 style="color: #ffd700; margin: 0;">${npc.name}</h2>
+                    <p style="color: #aaa; margin: 5px 0 0 0;">${npc.role}</p>
+                </div>
+            </div>
+            <p style="font-size: 18px; line-height: 1.6; margin-bottom: 30px;">${dialogueText}</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                ${quest && !quest.completed ? `
+                    <button id="start-quest" style="padding: 12px 30px; font-size: 16px; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer;">Start Quest</button>
+                ` : ''}
+                <button id="close-dialogue" style="padding: 12px 30px; font-size: 16px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">Close</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    if (quest && !quest.completed) {
+        document.getElementById('start-quest').addEventListener('click', () => {
+            overlay.remove();
+            if (quest.challengeType) {
+                startMiniGame(quest.challengeType, quest, sceneRef);
+            }
+        });
+    }
+    
+    document.getElementById('close-dialogue').addEventListener('click', () => {
+        overlay.remove();
+    });
+    
+    // Track that player met this NPC
+    if (!gameState.charactersMet.includes(npcId)) {
+        gameState.charactersMet.push(npcId);
     }
 }
 
 function updateUI() {
-    document.getElementById('player-level').textContent = gameState.level;
-    const decorationCount = gameState.decorationsUnlocked.length;
-    document.getElementById('player-xp').textContent = decorationCount;
-    document.getElementById('player-xp-max').textContent = Object.keys(decorationTypes).length;
-    document.getElementById('reindeer-count').textContent = gameState.decorations.length;
+    // Update chapter/level display
+    if (document.getElementById('player-level')) {
+        document.getElementById('player-level').textContent = `Chapter ${gameState.chapter}`;
+    }
+    
+    // Update cultural tokens
+    if (document.getElementById('player-xp')) {
+        document.getElementById('player-xp').textContent = gameState.culturalTokens;
+    }
+    if (document.getElementById('player-xp-max')) {
+        document.getElementById('player-xp-max').textContent = 'Tokens';
+    }
+    
+    // Update artifacts count
+    if (document.getElementById('reindeer-count')) {
+        document.getElementById('reindeer-count').textContent = `${gameState.artifacts.length}/7`;
+    }
+    
+    // Update story progress if element exists
+    const progressEl = document.getElementById('story-progress');
+    if (progressEl) {
+        progressEl.textContent = `Story: ${gameState.storyProgress}%`;
+    }
 }
 
-function updateTaskUI() {
+function updateQuestUI() {
     const taskList = document.getElementById('task-list');
+    if (!taskList) return;
+    
     taskList.innerHTML = '';
     
-    gameState.tasks.forEach(task => {
-        const taskItem = document.createElement('div');
-        taskItem.className = `task-item ${task.completed ? 'completed' : ''}`;
+    // Show active quests for current chapter
+    const activeQuests = gameState.quests.filter(q => !q.completed);
+    const completedQuests = gameState.quests.filter(q => q.completed);
+    
+    // Show active quests first
+    activeQuests.forEach(quest => {
+        const questItem = document.createElement('div');
+        questItem.className = `task-item`;
         
-        const progressPercent = Math.min((task.progress / task.maxProgress) * 100, 100);
-        const locationHint = task.requiresLocation ? 
-            `<div style="font-size: 12px; color: #ffd700; margin-top: 5px;">📍 Go to: ${task.requiresLocation === 'lake' ? 'Lake' : task.requiresLocation === 'kitchen' ? 'Kitchen Area' : 'Classroom'}</div>` : '';
+        const progressPercent = Math.min((quest.progress / quest.maxProgress) * 100, 100);
+        const locationHint = quest.location ? 
+            `<div style="font-size: 12px; color: #ffd700; margin-top: 5px;">📍 Location: ${quest.location}</div>` : '';
         
-        const rewardText = task.reward && task.reward.decorations ? 
-            `Reward: ${task.reward.decorations.map(d => decorationTypes[d] ? decorationTypes[d].emoji + ' ' + decorationTypes[d].name : d).join(', ')}` :
-            'Reward: Decorations';
+        const rewardText = quest.reward ? 
+            `Reward: ${quest.reward.tokens || 0} Tokens + ${artifacts[quest.reward.artifact]?.name || 'Artifact'}` :
+            'Reward: Artifact';
         
-        taskItem.innerHTML = `
-            <div class="task-title">${task.title} - ${task.samiWord}</div>
-            <div class="task-description">${task.description}</div>
+        questItem.innerHTML = `
+            <div class="task-title">${quest.title} - ${quest.samiWord}</div>
+            <div class="task-description">${quest.description}</div>
             ${locationHint}
             <div class="task-reward">${rewardText}</div>
             <div class="task-progress">
                 <div class="task-progress-bar" style="width: ${progressPercent}%"></div>
             </div>
-            <div style="font-size: 12px; margin-top: 5px;">Progress: ${task.progress}/${task.maxProgress}</div>
+            <div style="font-size: 12px; margin-top: 5px;">Progress: ${quest.progress}/${quest.maxProgress}</div>
         `;
         
-        taskList.appendChild(taskItem);
+        taskList.appendChild(questItem);
+    });
+    
+    // Show completed quests
+    completedQuests.forEach(quest => {
+        const questItem = document.createElement('div');
+        questItem.className = `task-item completed`;
+        questItem.innerHTML = `
+            <div class="task-title">✓ ${quest.title} - ${quest.samiWord}</div>
+            <div class="task-description" style="opacity: 0.7;">${quest.description}</div>
+            <div style="font-size: 12px; color: #27ae60; margin-top: 5px;">✓ Completed</div>
+        `;
+        taskList.appendChild(questItem);
+    });
+    
+    // Show artifact collection
+    if (gameState.artifacts.length > 0) {
+        const artifactSection = document.createElement('div');
+        artifactSection.style.cssText = 'margin-top: 20px; padding-top: 20px; border-top: 2px solid #667eea;';
+        artifactSection.innerHTML = `
+            <div style="font-weight: bold; color: #ffd700; margin-bottom: 10px;">Artifacts Collected: ${gameState.artifacts.length}/7</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                ${gameState.artifacts.map(a => {
+                    const art = artifacts[a];
+                    return `<div style="padding: 5px 10px; background: rgba(255, 215, 0, 0.2); border: 1px solid #ffd700; border-radius: 5px; font-size: 12px;">✨ ${art?.name || a}</div>`;
+                }).join('')}
+            </div>
+        `;
+        taskList.appendChild(artifactSection);
+    }
+}
+
+// Mini-Game System - All Challenge Types
+function startMiniGame(gameType, quest, scene) {
+    activeMiniGame = { type: gameType, quest: quest, scene: scene };
+    
+    if (gameType === 'language-puzzle') {
+        startLanguagePuzzle(quest, scene);
+    } else if (gameType === 'reindeer-herding') {
+        startReindeerHerdingGame(quest, scene);
+    } else if (gameType === 'duodji-crafting') {
+        startDuodjiCraftingGame(quest, scene);
+    } else if (gameType === 'yoik-puzzle') {
+        startYoikPuzzle(quest, scene);
+    } else if (gameType === 'environmental-challenge') {
+        startEnvironmentalChallenge(quest, scene);
+    } else if (gameType === 'history-timeline') {
+        startHistoryTimelineQuest(quest, scene);
+    } else if (gameType === 'final-quest') {
+        startFinalQuest(quest, scene);
+    } else if (gameType === 'fishing') {
+        startFishingGame(quest, scene);
+    } else if (gameType === 'cutting') {
+        startCuttingGame(quest, scene);
+    } else if (gameType === 'painting') {
+        startPaintingGame(quest, scene);
+    } else if (gameType === 'language-quiz') {
+        startLanguageQuiz(quest, scene);
+    } else if (gameType === 'history-quiz') {
+        startHistoryQuiz(quest, scene);
+    }
+}
+
+// Challenge Type 1: Language Puzzle
+function startLanguagePuzzle(quest, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'language-puzzle';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    const samiWords = [
+        { word: 'Boazu', meaning: 'Reindeer', image: '🦌' },
+        { word: 'Lávvu', meaning: 'Tent', image: '⛺' },
+        { word: 'Giella', meaning: 'Language', image: '📚' },
+        { word: 'Skuvla', meaning: 'School', image: '🏫' },
+        { word: 'Duodji', meaning: 'Handicrafts', image: '🎨' },
+        { word: 'Gákti', meaning: 'Traditional Clothing', image: '👕' },
+        { word: 'Joik', meaning: 'Yoik (Song)', image: '🎵' },
+        { word: 'Sápmi', meaning: 'Sámi Homeland', image: '🗺️' }
+    ];
+    
+    let currentMatches = 0;
+    let selectedWord = null;
+    let selectedMeaning = null;
+    const matchedPairs = [];
+    
+    function createGame() {
+        const shuffledWords = [...samiWords].sort(() => Math.random() - 0.5);
+        const shuffledMeanings = [...samiWords].map(w => w.meaning).sort(() => Math.random() - 0.5);
+        
+        overlay.innerHTML = `
+            <h2 style="margin-bottom: 20px; color: #ffd700;">Language Puzzle - Match Sámi Words</h2>
+            <p style="margin-bottom: 20px;">Match each Sámi word to its meaning. Complete ${quest.maxProgress} matches to earn the Language Stone!</p>
+            <div style="display: flex; gap: 30px; margin-bottom: 20px;">
+                <div id="words-column" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                <div id="meanings-column" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+            <p id="match-progress" style="margin-top: 20px;">Matches: ${currentMatches}/${quest.maxProgress}</p>
+            <button id="close-language" style="margin-top: 20px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+        `;
+        
+        const wordsCol = document.getElementById('words-column');
+        const meaningsCol = document.getElementById('meanings-column');
+        
+        shuffledWords.slice(0, quest.maxProgress).forEach((wordObj, idx) => {
+            if (matchedPairs.includes(idx)) return;
+            
+            const wordBtn = document.createElement('button');
+            wordBtn.textContent = `${wordObj.image} ${wordObj.word}`;
+            wordBtn.style.cssText = 'padding: 15px 20px; font-size: 16px; background: rgba(102, 126, 234, 0.3); color: white; border: 2px solid #667eea; border-radius: 10px; cursor: pointer; min-width: 200px;';
+            wordBtn.addEventListener('click', () => {
+                document.querySelectorAll('#words-column button').forEach(b => b.style.borderColor = '#667eea');
+                wordBtn.style.borderColor = '#ffd700';
+                selectedWord = wordObj;
+                checkMatch();
+            });
+            wordsCol.appendChild(wordBtn);
+        });
+        
+        shuffledMeanings.slice(0, quest.maxProgress).forEach((meaning, idx) => {
+            const meaningBtn = document.createElement('button');
+            meaningBtn.textContent = meaning;
+            meaningBtn.style.cssText = 'padding: 15px 20px; font-size: 16px; background: rgba(102, 126, 234, 0.3); color: white; border: 2px solid #667eea; border-radius: 10px; cursor: pointer; min-width: 200px;';
+            meaningBtn.addEventListener('click', () => {
+                document.querySelectorAll('#meanings-column button').forEach(b => b.style.borderColor = '#667eea');
+                meaningBtn.style.borderColor = '#ffd700';
+                selectedMeaning = meaning;
+                checkMatch();
+            });
+            meaningsCol.appendChild(meaningBtn);
+        });
+        
+        function checkMatch() {
+            if (selectedWord && selectedMeaning) {
+                if (selectedWord.meaning === selectedMeaning) {
+                    currentMatches++;
+                    document.getElementById('match-progress').textContent = `Matches: ${currentMatches}/${quest.maxProgress}`;
+                    selectedWord = null;
+                    selectedMeaning = null;
+                    
+                    if (currentMatches >= quest.maxProgress) {
+                        completeQuest(quest);
+                        overlay.remove();
+                        activeMiniGame = null;
+                        showArtifactReward(quest.reward.artifact);
+                        return;
+                    }
+                } else {
+                    setTimeout(() => {
+                        document.querySelectorAll('#words-column button, #meanings-column button').forEach(b => b.style.borderColor = '#667eea');
+                        selectedWord = null;
+                        selectedMeaning = null;
+                    }, 1000);
+                }
+            }
+        }
+        
+        document.getElementById('close-language').addEventListener('click', () => {
+            overlay.remove();
+            activeMiniGame = null;
+        });
+    }
+    
+    document.body.appendChild(overlay);
+    createGame();
+}
+
+// Challenge Type 2: Reindeer Herding Mini-Game
+function startReindeerHerdingGame(quest, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'reindeer-herding';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 20px; color: #ffd700;">Reindeer Herding Challenge</h2>
+        <p style="margin-bottom: 20px;">Guide the reindeer herd to the safe grazing area. Avoid predators and obstacles!</p>
+        <canvas id="herding-canvas" width="600" height="400" style="border: 3px solid #fff; border-radius: 10px; background: #87CEEB; cursor: crosshair;"></canvas>
+        <div style="margin-top: 20px; display: flex; gap: 20px; align-items: center;">
+            <p id="herd-status">Reindeer: 5/5 | Distance: 0%</p>
+            <button id="close-herding" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+        </div>
+        <p style="margin-top: 10px; font-size: 14px;">Click to guide the herd. Watch for wolves and dangerous terrain!</p>
+    `;
+    
+    document.body.appendChild(overlay);
+    const canvas = document.getElementById('herding-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let reindeer = [
+        { x: 50, y: 200, speed: 2 },
+        { x: 80, y: 180, speed: 2 },
+        { x: 80, y: 220, speed: 2 },
+        { x: 110, y: 200, speed: 2 },
+        { x: 110, y: 190, speed: 2 }
+    ];
+    let targetX = 550;
+    let targetY = 200;
+    let progress = 0;
+    let gameWon = false;
+    
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw target area (green circle)
+        ctx.fillStyle = '#228B22';
+        ctx.beginPath();
+        ctx.arc(targetX, targetY, 40, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Draw reindeer
+        reindeer.forEach(r => {
+            ctx.fillStyle = '#8B7355';
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, 12, 0, Math.PI * 2);
+            ctx.fill();
+            // Antlers
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(r.x - 8, r.y - 8);
+            ctx.lineTo(r.x - 12, r.y - 12);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(r.x + 8, r.y - 8);
+            ctx.lineTo(r.x + 12, r.y - 12);
+            ctx.stroke();
+        });
+        
+        // Calculate progress
+        const avgX = reindeer.reduce((sum, r) => sum + r.x, 0) / reindeer.length;
+        progress = Math.min((avgX / targetX) * 100, 100);
+        
+        // Update status
+        document.getElementById('herd-status').textContent = `Reindeer: ${reindeer.length}/5 | Progress: ${Math.floor(progress)}%`;
+        
+        if (progress >= 95 && !gameWon) {
+            gameWon = true;
+            completeQuest(quest);
+            setTimeout(() => {
+                overlay.remove();
+                activeMiniGame = null;
+                showArtifactReward(quest.reward.artifact);
+            }, 1000);
+        }
+    }
+    
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        targetX = e.clientX - rect.left;
+        targetY = e.clientY - rect.top;
+    });
+    
+    function update() {
+        reindeer.forEach(r => {
+            const dx = targetX - r.x;
+            const dy = targetY - r.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 5) {
+                r.x += (dx / dist) * r.speed;
+                r.y += (dy / dist) * r.speed;
+            }
+        });
+        draw();
+        if (!gameWon) requestAnimationFrame(update);
+    }
+    
+    document.getElementById('close-herding').addEventListener('click', () => {
+        overlay.remove();
+        activeMiniGame = null;
+    });
+    
+    draw();
+    update();
+}
+
+// Challenge Type 3: Duodji Crafting Challenge
+function startDuodjiCraftingGame(quest, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'duodji-crafting';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 20px; color: #ffd700;">Duodji Crafting Challenge</h2>
+        <p style="margin-bottom: 20px;">Assemble the traditional Sámi pattern by dragging the pieces into place.</p>
+        <div style="display: flex; gap: 30px;">
+            <div id="pattern-pieces" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 20px; background: rgba(30, 30, 40, 0.8); border-radius: 10px;"></div>
+            <div id="pattern-board" style="width: 300px; height: 300px; border: 3px dashed #667eea; border-radius: 10px; background: rgba(255, 255, 255, 0.1); position: relative;"></div>
+        </div>
+        <button id="check-pattern" style="margin-top: 20px; padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Check Pattern</button>
+        <button id="close-duodji" style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const pieces = ['◊', '▲', '●', '■', '◆', '★'];
+    const piecesContainer = document.getElementById('pattern-pieces');
+    const board = document.getElementById('pattern-board');
+    const placedPieces = [];
+    
+    pieces.forEach((piece, idx) => {
+        const pieceEl = document.createElement('div');
+        pieceEl.textContent = piece;
+        pieceEl.style.cssText = `
+            width: 60px; height: 60px; font-size: 40px; display: flex;
+            align-items: center; justify-content: center; background: rgba(102, 126, 234, 0.3);
+            border: 2px solid #667eea; border-radius: 5px; cursor: move;
+            user-select: none;
+        `;
+        pieceEl.draggable = true;
+        pieceEl.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('piece', piece);
+            e.dataTransfer.setData('index', idx);
+        });
+        piecesContainer.appendChild(pieceEl);
+    });
+    
+    board.addEventListener('dragover', (e) => e.preventDefault());
+    board.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const piece = e.dataTransfer.getData('piece');
+        const rect = board.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const placed = document.createElement('div');
+        placed.textContent = piece;
+        placed.style.cssText = `
+            position: absolute; left: ${x - 30}px; top: ${y - 30}px;
+            width: 60px; height: 60px; font-size: 40px; display: flex;
+            align-items: center; justify-content: center; background: rgba(102, 126, 234, 0.5);
+            border: 2px solid #ffd700; border-radius: 5px;
+        `;
+        board.appendChild(placed);
+        placedPieces.push({ piece, x, y });
+    });
+    
+    document.getElementById('check-pattern').addEventListener('click', () => {
+        if (placedPieces.length >= 4) {
+            completeQuest(quest);
+            overlay.remove();
+            activeMiniGame = null;
+            showArtifactReward(quest.reward.artifact);
+        } else {
+            alert('Place at least 4 pattern pieces to complete the duodji!');
+        }
+    });
+    
+    document.getElementById('close-duodji').addEventListener('click', () => {
+        overlay.remove();
+        activeMiniGame = null;
     });
 }
 
-// Mini-Game System
-function startMiniGame(gameType, task, scene) {
-    activeMiniGame = { type: gameType, task: task, scene: scene };
+// Challenge Type 4: Yoik Puzzle
+function startYoikPuzzle(quest, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'yoik-puzzle';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
     
-    if (gameType === 'fishing') {
-        startFishingGame(task, scene);
-    } else if (gameType === 'cutting') {
-        startCuttingGame(task, scene);
-    } else if (gameType === 'painting') {
-        startPaintingGame(task, scene);
-    } else if (gameType === 'language-quiz') {
-        startLanguageQuiz(task, scene);
-    } else if (gameType === 'history-quiz') {
-        startHistoryQuiz(task, scene);
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 20px; color: #ffd700;">Yoik Rhythm Puzzle</h2>
+        <p style="margin-bottom: 20px;">Listen to the rhythm pattern and repeat it. Joik connects us to feelings and places.</p>
+        <div id="rhythm-display" style="font-size: 48px; margin: 30px 0; min-height: 80px; display: flex; align-items: center; justify-content: center; gap: 10px;"></div>
+        <div id="rhythm-input" style="display: flex; gap: 15px; margin: 20px 0;"></div>
+        <p id="rhythm-feedback" style="margin-top: 20px; font-size: 18px;"></p>
+        <button id="play-rhythm" style="margin-top: 20px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Play Rhythm</button>
+        <button id="check-rhythm" style="margin-top: 10px; padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Check</button>
+        <button id="close-yoik" style="margin-top: 10px; padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const rhythmPattern = ['♪', '♪', '♫', '♪', '♫', '♪'];
+    const userPattern = [];
+    let patternShown = false;
+    
+    function showPattern() {
+        const display = document.getElementById('rhythm-display');
+        display.innerHTML = '';
+        rhythmPattern.forEach((note, idx) => {
+            setTimeout(() => {
+                const noteEl = document.createElement('span');
+                noteEl.textContent = note;
+                noteEl.style.cssText = 'animation: pulse 0.5s;';
+                display.appendChild(noteEl);
+            }, idx * 500);
+        });
+        patternShown = true;
+    }
+    
+    const inputContainer = document.getElementById('rhythm-input');
+    ['♪', '♫'].forEach(note => {
+        const btn = document.createElement('button');
+        btn.textContent = note;
+        btn.style.cssText = 'font-size: 32px; padding: 15px 20px; background: rgba(102, 126, 234, 0.3); color: white; border: 2px solid #667eea; border-radius: 10px; cursor: pointer;';
+        btn.addEventListener('click', () => {
+            userPattern.push(note);
+            document.getElementById('rhythm-feedback').textContent = `Your pattern: ${userPattern.join(' ')}`;
+        });
+        inputContainer.appendChild(btn);
+    });
+    
+    document.getElementById('play-rhythm').addEventListener('click', () => {
+        showPattern();
+        userPattern.length = 0;
+        document.getElementById('rhythm-feedback').textContent = '';
+    });
+    
+    document.getElementById('check-rhythm').addEventListener('click', () => {
+        if (userPattern.length === 0) {
+            document.getElementById('rhythm-feedback').textContent = 'Please create a rhythm pattern first!';
+            return;
+        }
+        const correct = JSON.stringify(userPattern) === JSON.stringify(rhythmPattern);
+        if (correct) {
+            document.getElementById('rhythm-feedback').textContent = 'Perfect! You understand the rhythm of joik!';
+            setTimeout(() => {
+                completeQuest(quest);
+                overlay.remove();
+                activeMiniGame = null;
+                showArtifactReward(quest.reward.artifact);
+            }, 1500);
+        } else {
+            document.getElementById('rhythm-feedback').textContent = 'Not quite right. Try again!';
+            userPattern.length = 0;
+        }
+    });
+    
+    document.getElementById('close-yoik').addEventListener('click', () => {
+        overlay.remove();
+        activeMiniGame = null;
+    });
+}
+
+// Challenge Type 5: Environmental Challenge
+function startEnvironmentalChallenge(quest, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'environmental-challenge';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    let fishing = 50;
+    let grazing = 50;
+    let resources = 50;
+    let balance = 0;
+    
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 20px; color: #ffd700;">Environmental Balance Challenge</h2>
+        <p style="margin-bottom: 20px;">Balance fishing, grazing, and resources. Traditional knowledge teaches us to respect the land.</p>
+        <div style="display: flex; gap: 30px; margin: 20px 0;">
+            <div style="text-align: center;">
+                <p>Fishing</p>
+                <div style="width: 200px; height: 20px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden;">
+                    <div id="fishing-bar" style="width: ${fishing}%; height: 100%; background: #20B2AA; transition: width 0.3s;"></div>
+                </div>
+                <p id="fishing-value">${fishing}%</p>
+                <button id="fish-more" style="margin: 5px; padding: 5px 10px; background: #20B2AA; color: white; border: none; border-radius: 5px; cursor: pointer;">Fish More</button>
+                <button id="fish-less" style="margin: 5px; padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">Fish Less</button>
+            </div>
+            <div style="text-align: center;">
+                <p>Grazing</p>
+                <div style="width: 200px; height: 20px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden;">
+                    <div id="grazing-bar" style="width: ${grazing}%; height: 100%; background: #228B22; transition: width 0.3s;"></div>
+                </div>
+                <p id="grazing-value">${grazing}%</p>
+                <button id="graze-more" style="margin: 5px; padding: 5px 10px; background: #228B22; color: white; border: none; border-radius: 5px; cursor: pointer;">Graze More</button>
+                <button id="graze-less" style="margin: 5px; padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">Graze Less</button>
+            </div>
+            <div style="text-align: center;">
+                <p>Resources</p>
+                <div style="width: 200px; height: 20px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden;">
+                    <div id="resources-bar" style="width: ${resources}%; height: 100%; background: #FFD700; transition: width 0.3s;"></div>
+                </div>
+                <p id="resources-value">${resources}%</p>
+                <button id="restore-resources" style="margin: 5px; padding: 5px 10px; background: #FFD700; color: white; border: none; border-radius: 5px; cursor: pointer;">Restore</button>
+            </div>
+        </div>
+        <p id="balance-status" style="margin-top: 20px; font-size: 18px;">Balance: ${balance}%</p>
+        <button id="check-balance" style="margin-top: 20px; padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Check Balance</button>
+        <button id="close-environmental" style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    function updateBalance() {
+        const avg = (fishing + grazing + resources) / 3;
+        const variance = Math.abs(fishing - avg) + Math.abs(grazing - avg) + Math.abs(resources - avg);
+        balance = Math.max(0, 100 - variance);
+        document.getElementById('balance-status').textContent = `Balance: ${Math.floor(balance)}%`;
+    }
+    
+    function updateBars() {
+        document.getElementById('fishing-bar').style.width = fishing + '%';
+        document.getElementById('fishing-value').textContent = fishing + '%';
+        document.getElementById('grazing-bar').style.width = grazing + '%';
+        document.getElementById('grazing-value').textContent = grazing + '%';
+        document.getElementById('resources-bar').style.width = resources + '%';
+        document.getElementById('resources-value').textContent = resources + '%';
+        updateBalance();
+    }
+    
+    document.getElementById('fish-more').addEventListener('click', () => {
+        if (fishing < 100) fishing += 10;
+        if (resources > 0) resources -= 5;
+        updateBars();
+    });
+    document.getElementById('fish-less').addEventListener('click', () => {
+        if (fishing > 0) fishing -= 10;
+        if (resources < 100) resources += 5;
+        updateBars();
+    });
+    document.getElementById('graze-more').addEventListener('click', () => {
+        if (grazing < 100) grazing += 10;
+        if (resources > 0) resources -= 5;
+        updateBars();
+    });
+    document.getElementById('graze-less').addEventListener('click', () => {
+        if (grazing > 0) grazing -= 10;
+        if (resources < 100) resources += 5;
+        updateBars();
+    });
+    document.getElementById('restore-resources').addEventListener('click', () => {
+        if (resources < 100) resources = Math.min(100, resources + 20);
+        if (fishing > 0) fishing = Math.max(0, fishing - 10);
+        if (grazing > 0) grazing = Math.max(0, grazing - 10);
+        updateBars();
+    });
+    
+    document.getElementById('check-balance').addEventListener('click', () => {
+        if (balance >= 80) {
+            completeQuest(quest);
+            overlay.remove();
+            activeMiniGame = null;
+            showArtifactReward(quest.reward.artifact);
+        } else {
+            alert(`Balance is ${Math.floor(balance)}%. You need at least 80% balance. Keep adjusting!`);
+        }
+    });
+    
+    document.getElementById('close-environmental').addEventListener('click', () => {
+        overlay.remove();
+        activeMiniGame = null;
+    });
+    
+    updateBars();
+}
+
+// Challenge Type 6: History Timeline Quest
+function startHistoryTimelineQuest(quest, scene) {
+    const overlay = document.createElement('div');
+    overlay.id = 'history-timeline';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.9); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    const events = [
+        { year: '1000 BCE', event: 'Sámi people begin reindeer herding', order: 1 },
+        { year: '1500s', event: 'First written records of Sámi culture', order: 2 },
+        { year: '1852', event: 'Kautokeino Uprising - Sámi resistance', order: 3 },
+        { year: '1917', event: 'Sámi flag first designed', order: 4 },
+        { year: '1989', event: 'First Sámi Parliament in Norway', order: 5 },
+        { year: '2000', event: 'Sámi Language Act passed', order: 6 }
+    ];
+    
+    const shuffledEvents = [...events].sort(() => Math.random() - 0.5);
+    const placedEvents = [];
+    
+    overlay.innerHTML = `
+        <h2 style="margin-bottom: 20px; color: #ffd700;">History Timeline Quest</h2>
+        <p style="margin-bottom: 20px;">Place the events in chronological order on the timeline.</p>
+        <div id="event-pool" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 200px; overflow-y: auto;"></div>
+        <div id="timeline" style="width: 800px; height: 100px; border: 3px solid #667eea; border-radius: 10px; background: rgba(255, 255, 255, 0.1); position: relative; margin: 20px 0;">
+            <div style="position: absolute; left: 0; top: 50%; width: 100%; height: 2px; background: #ffd700;"></div>
+        </div>
+        <button id="check-timeline" style="margin-top: 20px; padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">Check Timeline</button>
+        <button id="close-timeline" style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+    `;
+    
+    document.body.appendChild(overlay);
+    const eventPool = document.getElementById('event-pool');
+    const timeline = document.getElementById('timeline');
+    
+    shuffledEvents.forEach((evt, idx) => {
+        const eventEl = document.createElement('div');
+        eventEl.textContent = `${evt.year}: ${evt.event}`;
+        eventEl.style.cssText = `
+            padding: 10px 15px; background: rgba(102, 126, 234, 0.3);
+            border: 2px solid #667eea; border-radius: 5px; cursor: move;
+            user-select: none;
+        `;
+        eventEl.draggable = true;
+        eventEl.dataset.order = evt.order;
+        eventEl.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('event', JSON.stringify(evt));
+        });
+        eventPool.appendChild(eventEl);
+    });
+    
+    timeline.addEventListener('dragover', (e) => e.preventDefault());
+    timeline.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const evt = JSON.parse(e.dataTransfer.getData('event'));
+        const rect = timeline.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        
+        const placed = document.createElement('div');
+        placed.textContent = evt.year;
+        placed.style.cssText = `
+            position: absolute; left: ${x - 30}px; top: 20px;
+            padding: 5px 10px; background: rgba(255, 215, 0, 0.8);
+            border: 2px solid #ffd700; border-radius: 5px; font-size: 12px;
+        `;
+        placed.dataset.order = evt.order;
+        placed.dataset.x = x;
+        timeline.appendChild(placed);
+        placedEvents.push({ event: evt, x: x });
+        
+        // Remove from pool
+        eventPool.querySelectorAll('div').forEach(el => {
+            if (el.textContent.includes(evt.year)) el.remove();
+        });
+    });
+    
+    document.getElementById('check-timeline').addEventListener('click', () => {
+        if (placedEvents.length < events.length) {
+            alert(`Place all ${events.length} events on the timeline!`);
+            return;
+        }
+        
+        // Check if events are in correct order (simplified check)
+        const sorted = [...placedEvents].sort((a, b) => a.x - b.x);
+        let correct = true;
+        for (let i = 0; i < sorted.length; i++) {
+            if (parseInt(sorted[i].event.order) !== i + 1) {
+                correct = false;
+                break;
+            }
+        }
+        
+        if (correct) {
+            completeQuest(quest);
+            overlay.remove();
+            activeMiniGame = null;
+            showArtifactReward(quest.reward.artifact);
+        } else {
+            alert('The timeline order is not quite right. Try again!');
+        }
+    });
+    
+    document.getElementById('close-timeline').addEventListener('click', () => {
+        overlay.remove();
+        activeMiniGame = null;
+    });
+}
+
+// Challenge Type 7: Final Quest - Restore Runebomme
+function startFinalQuest(quest, scene) {
+    // Check if all artifacts are collected
+    const required = quest.requiresArtifacts || [];
+    const missing = required.filter(a => !gameState.artifacts.includes(a));
+    
+    if (missing.length > 0) {
+        alert(`You need to collect all artifacts first! Missing: ${missing.join(', ')}`);
+        return;
+    }
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'final-quest';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.95); z-index: 5000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: white;
+    `;
+    
+    overlay.innerHTML = `
+        <h1 style="margin-bottom: 20px; color: #ffd700; font-size: 36px;">Restore the Runebomme</h1>
+        <p style="margin-bottom: 30px; font-size: 20px; text-align: center; max-width: 600px;">
+            With all artifacts collected, you can now restore the sacred runebomme drum. 
+            This will complete your journey as a Yoik Guardian Apprentice.
+        </p>
+        <div style="font-size: 120px; margin: 30px 0;">🥁</div>
+        <div style="display: flex; gap: 20px; margin: 30px 0;">
+            ${required.map(a => `<div style="font-size: 48px;" title="${artifacts[a]?.name || a}">✨</div>`).join('')}
+        </div>
+        <p style="margin-bottom: 20px;">All artifacts are united. The runebomme is restored!</p>
+        <button id="restore-drum" style="padding: 15px 30px; font-size: 18px; background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%); color: #000; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;">Restore Runebomme</button>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    document.getElementById('restore-drum').addEventListener('click', () => {
+        completeQuest(quest);
+        gameState.storyProgress = 100;
+        overlay.innerHTML = `
+            <h1 style="margin-bottom: 20px; color: #ffd700; font-size: 36px;">Congratulations!</h1>
+            <p style="margin-bottom: 30px; font-size: 20px; text-align: center; max-width: 600px;">
+                You have successfully restored the runebomme and completed your training as a Yoik Guardian!
+                You have learned about Sámi culture, history, language, and traditions.
+            </p>
+            <div style="font-size: 120px; margin: 30px 0;">🎉</div>
+            <p style="font-size: 18px; margin-bottom: 20px;">Sápmi's cultural treasures are safe in your hands.</p>
+            <button id="close-final" style="padding: 15px 30px; font-size: 18px; background: #667eea; color: white; border: none; border-radius: 10px; cursor: pointer;">Continue</button>
+        `;
+        
+        document.getElementById('close-final').addEventListener('click', () => {
+            overlay.remove();
+            activeMiniGame = null;
+            showArtifactReward(quest.reward.artifact);
+            updateUI();
+        });
+    });
+}
+
+// Quest completion system
+function completeQuest(quest) {
+    quest.progress = quest.maxProgress;
+    if (!quest.completed) {
+        quest.completed = true;
+        gameState.completedQuests.push(quest.id);
+        
+        // Award tokens
+        if (quest.reward && quest.reward.tokens) {
+            gameState.culturalTokens += quest.reward.tokens;
+        }
+        
+        // Award artifact
+        if (quest.reward && quest.reward.artifact) {
+            if (!gameState.artifacts.includes(quest.reward.artifact)) {
+                gameState.artifacts.push(quest.reward.artifact);
+            }
+        }
+        
+        // Update story progress
+        const totalQuests = availableQuests.length;
+        const completed = gameState.completedQuests.length;
+        gameState.storyProgress = Math.floor((completed / totalQuests) * 100);
+        
+        // Check if chapter complete, advance to next
+        const chapterQuests = availableQuests.filter(q => q.chapter === gameState.chapter);
+        const chapterComplete = chapterQuests.every(q => gameState.completedQuests.includes(q.id));
+        if (chapterComplete && gameState.chapter < 7) {
+            gameState.chapter++;
+            initializeQuests();
+        }
+        
+        updateUI();
+        updateQuestUI();
+        saveGame();
+    }
+}
+
+function showArtifactReward(artifactId) {
+    const artifact = artifacts[artifactId];
+    if (artifact) {
+        showEducationalPopup(artifactId.replace('-', ''));
+        setTimeout(() => {
+            showReward(`Artifact Collected: ${artifact.name}! +${gameState.culturalTokens} Cultural Knowledge Tokens`);
+        }, 2000);
     }
 }
 
@@ -1730,15 +2772,18 @@ function showEducationalPopup(key) {
 function saveGame() {
     const saveData = {
         level: gameState.level,
-        decorations: gameState.decorations,
-        decorationsUnlocked: gameState.decorationsUnlocked,
-        buildings: gameState.buildings,
-        tasks: gameState.tasks,
-        completedTasks: gameState.completedTasks,
-        playerPosition: gameState.playerPosition
+        chapter: gameState.chapter,
+        artifacts: gameState.artifacts,
+        culturalTokens: gameState.culturalTokens,
+        quests: gameState.quests,
+        completedQuests: gameState.completedQuests,
+        playerPosition: gameState.playerPosition,
+        storyProgress: gameState.storyProgress,
+        charactersMet: gameState.charactersMet,
+        locationsVisited: gameState.locationsVisited
     };
     
-    localStorage.setItem('samiAdventureSave', JSON.stringify(saveData));
+    localStorage.setItem('samiQuestSave', JSON.stringify(saveData));
     
     // Show save indicator
     const indicator = document.getElementById('save-indicator');
@@ -1749,42 +2794,45 @@ function saveGame() {
 }
 
 function loadGame() {
-    const saveData = localStorage.getItem('samiAdventureSave');
+    const saveData = localStorage.getItem('samiQuestSave') || localStorage.getItem('samiAdventureSave'); // Support old saves
     if (saveData) {
         const data = JSON.parse(saveData);
         gameState = { ...gameState, ...data };
         
-        // Initialize decorations arrays if missing (for old saves)
-        if (!gameState.decorations) {
-            gameState.decorations = [];
-        }
-        if (!gameState.decorationsUnlocked) {
-            gameState.decorationsUnlocked = [];
-        }
+        // Initialize arrays if missing
+        if (!gameState.artifacts) gameState.artifacts = [];
+        if (!gameState.quests) gameState.quests = [];
+        if (!gameState.completedQuests) gameState.completedQuests = [];
+        if (!gameState.charactersMet) gameState.charactersMet = [];
+        if (!gameState.locationsVisited) gameState.locationsVisited = [];
+        if (!gameState.culturalTokens) gameState.culturalTokens = 0;
+        if (!gameState.chapter) gameState.chapter = 1;
+        if (!gameState.storyProgress) gameState.storyProgress = 0;
         
-        // Migrate tasks if needed (add new properties to old saves)
-        if (gameState.tasks && gameState.tasks.length > 0) {
-            const savedTaskIds = gameState.tasks.map(t => t.id);
-            gameState.tasks = gameState.tasks.map(savedTask => {
-                // Find matching task template
-                const template = availableTasks.find(t => t.id === savedTask.id);
+        // Migrate quests if needed
+        if (gameState.quests && gameState.quests.length > 0) {
+            const savedQuestIds = gameState.quests.map(q => q.id);
+            gameState.quests = gameState.quests.map(savedQuest => {
+                const template = availableQuests.find(q => q.id === savedQuest.id);
                 if (template) {
-                    // Merge saved progress with template properties
                     return {
                         ...template,
-                        progress: savedTask.progress || 0,
-                        completed: savedTask.completed || false
+                        progress: savedQuest.progress || 0,
+                        completed: savedQuest.completed || false
                     };
                 }
-                return savedTask;
+                return savedQuest;
             });
             
-            // Add any new tasks that weren't in the save
-            availableTasks.forEach(template => {
-                if (!savedTaskIds.includes(template.id)) {
-                    gameState.tasks.push({ ...template });
+            // Add any new quests that weren't in the save
+            availableQuests.forEach(template => {
+                if (!savedQuestIds.includes(template.id) && template.chapter === gameState.chapter) {
+                    gameState.quests.push({ ...template });
                 }
             });
+        } else {
+            // Initialize quests if none exist
+            initializeQuests();
         }
         
         updateUI();
